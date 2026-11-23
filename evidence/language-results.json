@@ -1,0 +1,238 @@
+{
+  "sample": "Two synthetic system voices, 10 Chinese and 10 English short sentences. Client and server on one Mac, PCM in real time. Semantic classifications by Codex, not independent human evaluation.",
+  "measurement": "Elapsed from sending typed input to receiving translated text. For audio, elapsed from the last voiced PCM packet sent to translation receipt at the listener client, including silence detection. Browser painting and physical devices excluded. A translation already requested for the same original can be served from cache.",
+  "translation": {
+    "p50_ms": 232,
+    "p95_ms": 485,
+    "maximum_ms": 951
+  },
+  "speech_to_translated_caption": {
+    "p50_ms": 1646,
+    "p95_ms": 1800,
+    "maximum_ms": 1804
+  },
+  "text_preserved": 20,
+  "speech_preserved": 17,
+  "cases": [
+    {
+      "source": "en",
+      "input": "We have not made a profit yet.",
+      "translation": "我们还没有盈利。",
+      "text_ms": 951,
+      "transcript": "We have not made a profit yet.",
+      "subtitle": "我们还没有盈利。",
+      "speech_ms": 1709,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "预算是五十美元。",
+      "translation": "The budget is fifty dollars.",
+      "text_ms": 485,
+      "transcript": "預算是50美元",
+      "subtitle": "The budget is 50 dollars.",
+      "speech_ms": 1636,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "en",
+      "input": "I can help for two hours on Friday.",
+      "translation": "我周五可以帮忙两个小时。",
+      "text_ms": 251,
+      "transcript": "I can help for two hours on Friday.",
+      "subtitle": "我周五可以帮忙两个小时。",
+      "speech_ms": 1442,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "我在找一位产品设计师。",
+      "translation": "I'm looking for a product designer.",
+      "text_ms": 232,
+      "transcript": "我再找一位產品設計師。",
+      "subtitle": "I will find another product designer.",
+      "speech_ms": 1744,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "“在找”听成“再找”，英文变成另找一位。"
+    },
+    {
+      "source": "en",
+      "input": "We have three paying customers.",
+      "translation": "我们有三个付费客户。",
+      "text_ms": 222,
+      "transcript": "We have three paying customers.",
+      "subtitle": "我们有三个付费客户。",
+      "speech_ms": 1419,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "我们还没有付费客户。",
+      "translation": "We don't have any paid customers yet.",
+      "text_ms": 321,
+      "transcript": "我們還沒有付費客戶",
+      "subtitle": "We don't have any paid customers yet.",
+      "speech_ms": 1804,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "en",
+      "input": "The prototype is ready for testing.",
+      "translation": "原型已经准备好进行测试了。",
+      "text_ms": 279,
+      "transcript": "The prototype is ready for testing.",
+      "subtitle": "原型已经准备好进行测试了。",
+      "speech_ms": 1423,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "下周一上午十点开会。",
+      "translation": "The meeting will be held at 10 a.m. next Monday.",
+      "text_ms": 394,
+      "transcript": "下週一上午10點開會",
+      "subtitle": "The meeting will be held at 10 a.m. next Monday.",
+      "speech_ms": 1800,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "en",
+      "input": "I can review the registration page.",
+      "translation": "我可以查看注册页面。",
+      "text_ms": 186,
+      "transcript": "I can review the registration page.",
+      "subtitle": "我可以查看注册页面。",
+      "speech_ms": 1412,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "这是一份有偿的短期工作。",
+      "translation": "This is a paid short-term job.",
+      "text_ms": 225,
+      "transcript": "这是一份有长的短期工作。",
+      "subtitle": "This is a long-term short-term job.",
+      "speech_ms": 1667,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "“有偿”听成“有长”，英文丢失报酬含义。"
+    },
+    {
+      "source": "en",
+      "input": "Do not share the customer's email.",
+      "translation": "请勿分享客户的电子邮件。",
+      "text_ms": 224,
+      "transcript": "Do not share the customer's email.",
+      "subtitle": "请勿分享客户的电子邮件。",
+      "speech_ms": 1449,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "先试用，不用付款。",
+      "translation": "Try it first without paying.",
+      "text_ms": 237,
+      "transcript": "先試用,不用付款。",
+      "subtitle": "Try it first without paying.",
+      "speech_ms": 1649,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "en",
+      "input": "Our budget is fifty dollars, not fifteen.",
+      "translation": "我们的预算是五十美元，而不是十五美元。",
+      "text_ms": 195,
+      "transcript": "Our budget is $50, not $15.",
+      "subtitle": "我们的预算是50美元，而不是15美元。",
+      "speech_ms": 1747,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "我可以远程工作两周。",
+      "translation": "I can work remotely for two weeks.",
+      "text_ms": 228,
+      "transcript": "我可以远程工作两周。",
+      "subtitle": "I can work remotely for two weeks.",
+      "speech_ms": 1657,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "en",
+      "input": "Let's agree on one small task.",
+      "translation": "让我们同意一项小任务。",
+      "text_ms": 249,
+      "transcript": "Let's agree on one small task.",
+      "subtitle": "让我们同意一项小任务。",
+      "speech_ms": 1451,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "这个项目用的是 Python。",
+      "translation": "This project uses Python.",
+      "text_ms": 204,
+      "transcript": "这个项目用的是Pason",
+      "subtitle": "Pason is used for this project.",
+      "speech_ms": 1646,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "项目名 Python 被听写为 Pason。"
+    },
+    {
+      "source": "en",
+      "input": "My name is Alex.",
+      "translation": "我叫Alex。",
+      "text_ms": 196,
+      "transcript": "My name is Alex.",
+      "subtitle": "我叫Alex。",
+      "speech_ms": 1402,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "我们要招募两位志愿者。",
+      "translation": "We need to recruit two volunteers.",
+      "text_ms": 202,
+      "transcript": "我們要招募兩位志願者",
+      "subtitle": "We need to recruit two volunteers.",
+      "speech_ms": 1676,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "en",
+      "input": "We need feedback on the first screen.",
+      "translation": "我们需要对第一屏幕的反馈。",
+      "text_ms": 257,
+      "transcript": "We need feedback on the first screen.",
+      "subtitle": "我们需要对第一屏幕的反馈。",
+      "speech_ms": 1433,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    },
+    {
+      "source": "zh",
+      "input": "请先看原文，然后提问。",
+      "translation": "Please read the original text first, and then ask questions.",
+      "text_ms": 295,
+      "transcript": "请先看原文,然后提问。",
+      "subtitle": "Please read the original text first, and then ask questions.",
+      "speech_ms": 1695,
+      "text_meaning_review": "保留原意",
+      "spoken_meaning_review": "保留原意"
+    }
+  ]
+}

@@ -1,0 +1,264 @@
+"""Real Chrome, three independent browser contexts, synthetic people and microphone."""
+
+import json
+import re
+import socket
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from urllib.request import urlopen
+
+from playwright.sync_api import expect, sync_playwright
+
+ROOT = Path(__file__).resolve().parents[1]
+EVIDENCE = ROOT / "evidence"
+
+
+def port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def grab(p, selector):
+    return p.locator(selector)
+
+
+def submit(p):
+    p.locator("#dialogSave").click()
+    expect(p.locator("#dialog")).not_to_be_visible()
+
+
+def fill(p, **data):
+    for key, val in data.items():
+        n = p.locator(f'[name="{key}"]')
+        if n.evaluate("x=>x.tagName") == "SELECT":
+            n.select_option(val)
+        else:
+            n.fill(val)
+
+
+def main():
+    evidence = []
+    errors = []
+    EVIDENCE.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp)
+        aiff = folder / "fake.aiff"
+        wav = folder / "fake.wav"
+        subprocess.run(
+            [
+                "say",
+                "-v",
+                "Samantha",
+                "-r",
+                "150",
+                "-o",
+                str(aiff),
+                "We have three paying customers.",
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                str(aiff),
+                "-af",
+                "apad=pad_dur=1.2",
+                "-ar",
+                "44100",
+                "-ac",
+                "1",
+                str(wav),
+            ],
+            check=True,
+        )
+        portnum = port()
+        url = f"http://127.0.0.1:{portnum}"
+        data = folder / "data"
+        with (folder / "server.log").open("w") as log:
+            svc = subprocess.Popen(
+                [
+                    str(ROOT / ".venv/bin/python"),
+                    "server.py",
+                    "--port",
+                    str(portnum),
+                    "--data",
+                    str(data),
+                ],
+                stdout=log,
+                stderr=log,
+                cwd=ROOT,
+            )
+            try:
+                for _ in range(100):
+                    try:
+                        if (
+                            json.load(urlopen(url + "/health", timeout=0.5))["service"]
+                            == "founders-cafe"
+                        ):
+                            break
+                    except OSError:
+                        time.sleep(0.12)
+                with sync_playwright() as pl:
+                    browser = pl.chromium.launch(
+                        channel="chrome",
+                        headless=True,
+                        args=[
+                            "--use-fake-ui-for-media-stream",
+                            "--use-fake-device-for-media-stream",
+                            "--use-file-for-fake-audio-capture=" + str(wav),
+                            "--autoplay-policy=no-user-gesture-required",
+                        ],
+                    )
+                    host = browser.new_context(
+                        viewport={"width": 1440, "height": 1050},
+                        permissions=["microphone"],
+                    )
+                    user = browser.new_context(viewport={"width": 390, "height": 844})
+                    visitor = browser.new_context()
+                    for c in [host, user, visitor]:
+                        c.add_init_script(
+                            "window.scheduledAudio=0;const start=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(...a){window.scheduledAudio++;return start.apply(this,a)}"
+                        )
+                        c.set_default_timeout(9000)
+                    h, u, v = [c.new_page() for c in (host, user, visitor)]
+                    for p in [h, u, v]:
+                        p.on("pageerror", lambda err: errors.append(str(err)))
+                    h.goto(url + "/#pass=" + (data / "host-pass").read_text())
+                    expect(h.locator("#take")).to_have_text("Take a seat")
+                    h.screenshot(path=EVIDENCE / "cafe-desktop.png", full_page=True)
+                    h.locator("#profile").click()
+                    fill(h, name="Mia", tag="Founder")
+                    h.get_by_role(
+                        "button", name="Create participant invitation"
+                    ).click()
+                    invite = h.locator("#dialog input[readonly]").input_value()
+                    submit(h)
+                    u.goto(invite)
+                    v.goto(url)
+                    expect(u.locator("#take")).to_have_text("Take a seat")
+                    u.locator("#language").select_option("zh")
+                    u.locator("#profile").click()
+                    fill(u, name="小林", tag="设计师", lang="zh")
+                    submit(u)
+                    h.locator("#take").click()
+                    u.locator("#take").click()
+                    expect(v.locator("#seatCount")).to_have_text("2 / 50 seated")
+                    evidence.append(
+                        "Two participants and a third observer see the same seats"
+                    )
+                    h.get_by_role("button", name="Request the stage").click()
+                    fill(
+                        h,
+                        title="Finding our first customers",
+                        goal="Learn how we tested the first screen",
+                    )
+                    submit(h)
+                    h.get_by_role("button", name="Confirm — take the stage").click()
+                    expect(u.locator("#stageState")).to_have_text("分享中")
+                    h.locator("#sayText").fill("We have three paying customers.")
+                    h.locator("#sendLine").click()
+                    expect(
+                        u.locator("#lines .translation > span").first
+                    ).not_to_have_text("We have three paying customers.", timeout=30000)
+                    u.locator("#sayText").fill("我可以帮忙设计页面。")
+                    u.locator("#sendLine").click()
+                    expect(
+                        h.locator("#lines .translation > span").first
+                    ).not_to_have_text("我可以帮忙设计页面。", timeout=30000)
+                    evidence.append(
+                        "English talk and Chinese question cross two clients with real local translations"
+                    )
+                    u.get_by_role("button", name="收听语音").click()
+                    h.get_by_role("button", name="Start microphone").click()
+                    submit(h)
+                    expect(h.locator("#lines")).to_contain_text(
+                        "Live caption", timeout=45000
+                    )
+                    u.wait_for_function("window.scheduledAudio>10", timeout=15000)
+                    evidence.append(
+                        "Synthetic microphone through browser capture, authenticated relay, listener playback scheduling and live speech caption"
+                    )
+                    h.get_by_role("button", name="Mute microphone").click()
+                    caption = (
+                        h.locator("#lines article")
+                        .filter(has_text="Live caption")
+                        .first
+                    )
+                    caption.get_by_role("button", name="Edit").click()
+                    fill(h, text="We have seven paid customers.")
+                    submit(h)
+                    corrected = (
+                        u.locator("#lines article")
+                        .filter(has_text="We have seven paid customers.")
+                        .first
+                    )
+                    expect(corrected).to_be_visible()
+                    expect(corrected.locator(".translation > span")).to_contain_text(
+                        re.compile("七|7"), timeout=30000
+                    )
+                    evidence.append(
+                        "Speaker correction retranslated from revised source in the second browser"
+                    )
+                    h.get_by_role("button", name="Post collaboration card").click()
+                    fill(
+                        h,
+                        title="Review signup",
+                        task="Review one screen",
+                        skills="Design",
+                        hours="2 hours",
+                        pay="paid",
+                    )
+                    submit(h)
+                    u.get_by_role("button", name="我可以帮忙").click()
+                    fill(u, text="我可以在周五帮忙。")
+                    submit(u)
+                    h.locator("#inboxNav").click()
+                    expect(h.locator("#inbox")).to_contain_text("Pending")
+                    h.get_by_role("button", name="Accept", exact=True).click()
+                    u.locator("#inboxNav").click()
+                    u.get_by_role("button", name="写私信").click()
+                    fill(u, text="Friday 14:00")
+                    submit(u)
+                    expect(h.locator("#inbox")).to_contain_text("Friday 14:00")
+                    v.locator("#inboxNav").click()
+                    expect(v.locator("#inbox")).not_to_contain_text("Friday 14:00")
+                    u.get_by_role("button", name="确认已约定下一步").click()
+                    h.get_by_role("button", name="Confirm a next step").click()
+                    expect(u.locator("#inbox")).to_contain_text("2/2")
+                    u.reload()
+                    expect(u.locator("#stageState")).to_have_text("分享中")
+                    u.locator("#inboxNav").click()
+                    expect(u.locator("#inbox")).to_contain_text("Friday 14:00")
+                    evidence.append(
+                        "Private invitation accepted, bilateral message and next step persisted after reload; third visitor saw no thread"
+                    )
+                    u.locator("#roomNav").click()
+                    u.screenshot(path=EVIDENCE / "cafe-mobile.png", full_page=True)
+                    assert u.evaluate(
+                        "document.documentElement.scrollWidth<=innerWidth"
+                    )
+                    h.locator("#roomNav").click()
+                    h.screenshot(path=EVIDENCE / "cafe-in-session.png", full_page=True)
+                    h.locator("#take").click()
+                    submit(h)
+                    expect(u.locator("#stageState")).to_have_text("空闲")
+                    assert not errors, errors
+                    evidence.append(
+                        "Mobile 390px without horizontal overflow; handoff clears old stage; no page exceptions"
+                    )
+                    browser.close()
+            finally:
+                svc.terminate()
+                svc.wait(timeout=10)
+        print(json.dumps(evidence, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

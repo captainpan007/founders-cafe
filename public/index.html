@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f3e9" />
+    <title>Founders’ Café</title>
+    <link rel="icon" href="/favicon.png" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <div class="wrap bar">
+        <a class="brand" href="/" aria-label="Founders’ Café"
+          ><span class="cupmark" aria-hidden="true">☕</span>Founders’ Café</a
+        >
+        <nav>
+          <button id="roomNav" class="nav active"></button
+          ><button id="inboxNav" class="nav"></button>
+        </nav>
+        <div class="right">
+          <select id="language" aria-label="Display language">
+            <option value="en">EN · English</option>
+            <option value="zh">中文</option></select
+          ><button id="profile" class="avatar" aria-label="Profile">☻</button>
+        </div>
+      </div>
+    </header>
+    <main class="wrap">
+      <div id="connection" role="status"></div>
+      <div id="roomPage">
+        <div class="opener">
+          <div>
+            <h1 id="roomTitle"></h1>
+            <div id="roomInfo"></div>
+          </div>
+          <button id="take" class="primary"></button>
+        </div>
+        <div class="columns">
+          <section class="floor panel">
+            <div class="map-head">
+              <h2 id="floorTitle"></h2>
+              <button id="view" class="small"></button>
+            </div>
+            <div class="scene">
+              <canvas id="map" width="600" height="358" role="img"></canvas>
+              <div id="spots"></div>
+            </div>
+            <div id="seatList" hidden></div>
+            <div class="map-foot">
+              <span id="floorHint"></span><span id="seatCount"></span>
+            </div>
+          </section>
+          <aside class="stage panel">
+            <div class="stage-top">
+              <span class="micicon" aria-hidden="true">♩</span
+              ><span id="stageLabel"></span><span id="stageState"></span>
+            </div>
+            <h2 id="stageTitle"></h2>
+            <div id="stageDesc"></div>
+            <div id="stageMeta"></div>
+            <div id="stageActions"></div>
+            <div id="queueStatus"></div>
+          </aside>
+        </div>
+        <div class="lower">
+          <section class="panel stream">
+            <div class="map-head">
+              <h2 id="transcriptTitle"></h2>
+              <div class="row">
+                <button id="fontSize" class="small">A+</button
+                ><button id="sound" class="small"></button>
+              </div>
+            </div>
+            <div id="lines"></div>
+            <form id="sayForm">
+              <select
+                id="sourceLang"
+                class="field"
+                aria-label="Speaking and writing language"
+              >
+                <option value="en">EN</option>
+                <option value="zh">中文</option></select
+              ><input id="sayText" maxlength="600" autocomplete="off" /><button
+                id="sendLine"
+                class="primary"
+              ></button>
+            </form>
+          </section>
+          <section class="panel collaboration">
+            <h2 id="cardTitle"></h2>
+            <div id="cards"></div>
+          </section>
+        </div>
+      </div>
+      <section id="inboxPage" hidden>
+        <div class="opener"><h1 id="inboxTitle"></h1></div>
+        <div id="inbox"></div>
+      </section>
+    </main>
+    <dialog id="dialog">
+      <form id="dialogForm">
+        <div class="dialog-head">
+          <h2 id="dialogTitle"></h2>
+          <button id="x" type="button" class="small" aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div id="dialogBody"></div>
+        <div id="dialogError" role="alert"></div>
+        <button id="dialogSave" class="primary"></button>
+      </form>
+    </dialog>
+    <div id="toast" role="status" hidden></div>
+    <footer class="wrap">
+      <span>Founders’ Café</span><span id="footerState"></span>
+    </footer>
+  </body>
+</html>
