@@ -126,7 +126,7 @@ class RoomCases(unittest.TestCase):
         with self.assertRaises(Rule):
             self.act("speaker", "say", stage=s["id"], text="late")
 
-    def test_private_accept_block_retention(self):
+    def test_public_discussion_permissions_and_retention(self):
         s = self.start()
         self.audience(2)
         self.act(
@@ -139,23 +139,53 @@ class RoomCases(unittest.TestCase):
             hours="2h",
             pay="paid",
         )
-        self.act("a0", "propose", id=s["id"], text="I can help")
-        key = next(iter(self.r.db["offers"]))
-        with self.assertRaises(Rule):
-            self.act("a0", "message", id=key, text="premature")
+        self.add("visitor", role="guest")
+        self.r.db["offers"]["old"] = dict(
+            id="old",
+            card=s["id"],
+            owner="speaker",
+            **{"from": "a0"},
+            status="accepted",
+            text="legacy private proposal",
+            updated=self.ts,
+            messages=[
+                dict(
+                    who="a0", text="legacy private conversation", lang="en", at=self.ts
+                )
+            ],
+        )
+        for action, target in (
+            ("propose", s["id"]),
+            ("message", "old"),
+            ("replyPublic", "old"),
+            ("nextStep", "old"),
+        ):
+            with self.subTest(action=action), self.assertRaises(Rule):
+                self.act("a0", action, id=target, text="must stay unpublished")
+        self.act("a0", "proposePublic", id=s["id"], text="I can help")
+        key = self.r.view("visitor")["discussions"][0]["id"]
+        self.act("visitor", "replyPublic", id=key, text="Can everyone join?")
+        for who in ("a0", "speaker", "visitor", "a1"):
+            view = self.r.view(who)
+            self.assertEqual(view["offers"], [])
+            self.assertEqual(len(view["discussions"]), 1)
+            self.assertNotIn("legacy private", str(view))
+            reply = view["discussions"][0]["messages"][0]
+            self.assertEqual(reply["text"], "Can everyone join?")
+            self.assertIn(reply["who"], view["people"])
+        for op in ("accept", "decline", "withdraw"):
+            with self.subTest(op=op), self.assertRaises(Rule):
+                self.act("a1", op, id=key)
         self.act("speaker", "accept", id=key)
-        self.act("a0", "message", id=key, text="private")
-        self.assertEqual(self.r.view("a1")["offers"], [])
+        self.act("a1", "replyPublic", id=key, text="Happy to review")
         with self.assertRaises(Rule):
-            self.act("a1", "message", id=key, text="private")
+            self.act("a1", "nextStep", id=key)
+        self.r.person("visitor")["muted"] = True
         with self.assertRaises(Rule):
-            self.act("a0", "withdraw", id=key)
+            self.act("visitor", "replyPublic", id=key, text="muted")
         for k in ("speaker", "a0"):
             self.act(k, "nextStep", id=key)
-        self.assertEqual(len(self.r.db["offers"][key]["confirmed"]), 2)
-        self.act("a0", "block", id=key)
-        with self.assertRaises(Rule):
-            self.act("speaker", "message", id=key, text="hi")
+        self.assertEqual(len(self.r.view("visitor")["discussions"][0]["confirmed"]), 2)
         self.act("speaker", "end", stage=s["id"])
         self.ts += 8 * DAY
         self.r.prune()
@@ -249,7 +279,11 @@ class RoomCases(unittest.TestCase):
         self.assertEqual(len(self.r.view("b")["chat"]), 80)
         self.assertEqual(self.r.view("b")["chat"][0]["text"], "1")
         self.r.db["blocks"].append(["b", "a"])
-        self.assertFalse(self.r.view("b")["chat"])
+        self.r.chat[0].pop(
+            "visibility"
+        )  # Existing lines retain their original audience.
+        self.assertEqual(len(self.r.view("b")["chat"]), 79)
+        self.assertEqual(self.r.view("b")["chat"][-1]["text"], "80")
 
     def test_idle_update_keeps_seats_for_reconnecting_guests(self):
         self.add("guest", 4, "guest")
@@ -264,6 +298,20 @@ class RoomCases(unittest.TestCase):
         fresh = Room(self.r.db, clock=lambda: self.ts)
         fresh.resume_listeners(saved, self.ts - 61)
         self.assertNotIn("guest", fresh.seats)
+
+    def test_idle_update_preserves_old_lobby_visibility_without_replaying_bubbles(self):
+        self.add("guest", 4, "guest")
+        self.add("reader")
+        self.r.db["blocks"].append(["reader", "guest"])
+        self.act("guest", "chat", text="new public line")
+        history = [dict(who="guest", text="older line", lang="en"), *self.r.chat]
+        restarted = Room(self.r.db, clock=lambda: self.ts)
+        restarted.resume_listeners(self.r.seats.copy(), self.ts, history)
+        self.assertEqual(
+            [m["text"] for m in restarted.view("reader")["chat"]], ["new public line"]
+        )
+        self.assertEqual(restarted.view("guest")["chat"][0]["at"], 0)
+        self.assertEqual(restarted.view("guest")["chat"][-1], self.r.chat[-1])
 
     def test_single_writer_and_restart(self):
         with tempfile.TemporaryDirectory() as d:

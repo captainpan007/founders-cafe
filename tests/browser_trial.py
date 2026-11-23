@@ -299,26 +299,42 @@ def main():
                     submit(u)
                     h.locator("#inboxNav").click()
                     expect(h.locator("#inbox")).to_contain_text("Pending")
-                    h.get_by_role("button", name="Accept", exact=True).click()
-                    u.locator("#inboxNav").click()
-                    u.get_by_role("button", name="写私信").click()
-                    fill(u, text="Friday 14:00")
-                    submit(u)
-                    expect(h.locator("#inbox")).to_contain_text("Friday 14:00")
-                    expect(v.locator("#speechBubbles")).not_to_contain_text(
-                        "Friday 14:00"
-                    )
+                    expect(
+                        v.locator(".speech-bubble[data-anchor=seat]")
+                    ).to_contain_text("我可以在周五帮忙。")
                     v.locator("#inboxNav").click()
-                    expect(v.locator("#inbox")).not_to_contain_text("Friday 14:00")
+                    expect(v.locator("#inbox")).to_contain_text("我可以在周五帮忙。")
+                    expect(v.get_by_role("button", name="撤回")).to_have_count(0)
+                    v.get_by_role("button", name="公开回复").click()
+                    expect(v.locator("#dialog")).to_contain_text("每个人都能看到")
+                    fill(v, text="也欢迎旁听者参与。")
+                    submit(v)
+                    u.locator("#inboxNav").click()
+                    expect(u.locator("#inbox")).to_contain_text("也欢迎旁听者参与。")
+                    expect(h.locator("#inbox")).to_contain_text("也欢迎旁听者参与。")
+                    h.get_by_role("button", name="Accept", exact=True).click()
+                    v.locator("#roomNav").click()
+                    u.get_by_role("button", name="公开回复").click()
+                    fill(u, text="周五两点一起分享")
+                    submit(u)
+                    expect(
+                        v.locator(".speech-bubble[data-anchor=seat]")
+                    ).to_contain_text("周五两点一起分享")
+                    expect(h.locator("#inbox")).to_contain_text("周五两点一起分享")
+                    v.locator("#inboxNav").click()
+                    expect(v.locator("#inbox")).to_contain_text("周五两点一起分享")
+                    expect(
+                        v.get_by_role("button", name="确认已约定下一步")
+                    ).to_have_count(0)
                     u.get_by_role("button", name="确认已约定下一步").click()
                     h.get_by_role("button", name="Confirm a next step").click()
                     expect(u.locator("#inbox")).to_contain_text("2/2")
                     u.reload()
                     expect(u.locator("#stageState")).to_have_text("分享中")
                     u.locator("#inboxNav").click()
-                    expect(u.locator("#inbox")).to_contain_text("Friday 14:00")
+                    expect(u.locator("#inbox")).to_contain_text("周五两点一起分享")
                     evidence.append(
-                        "Private invitation accepted, bilateral message and next step persisted after reload; third visitor saw no thread"
+                        "A third unseated visitor read the pending public proposal, replied before acceptance and saw the accepted thread and avatar speech. Replies reached both other identities. Only the two collaborators confirmed the next step. Reload preserved the thread."
                     )
                     u.locator("#roomNav").click()
                     u.screenshot(path=EVIDENCE / "cafe-mobile.png", full_page=True)
@@ -341,7 +357,7 @@ def main():
                     )
                     expect(v.locator("#chatLog")).to_contain_text("最后一句")
                     evidence.append(
-                        "Stage text and seated questions used distinct anchors; private offer messages never entered bubbles. A fresh bubble expired while its original stayed in chat."
+                        "Stage text and seated questions used distinct anchors; A fresh bubble expired while its original stayed in chat."
                     )
                     assert not errors, errors
                     evidence.append(

@@ -19,7 +19,10 @@ const errors = {
   invalid: ["Check the fields and try again.", "请检查填写内容。"],
   required: ["Fill in the required fields.", "请填好必填项。"],
   pass: ["This action needs a participant pass.", "这个操作需要参与凭证。"],
-  private: ["This action is private.", "你没有此项操作权限。"],
+  private: [
+    "You do not have permission for this action.",
+    "你没有此项操作权限。",
+  ],
   stale: [
     "The room has changed. Check the current stage.",
     "房间状态已更新，请查看当前讲台。",
@@ -32,7 +35,7 @@ const errors = {
   closed: ["This request is closed.", "这项请求已关闭。"],
   exists: ["You have already done that.", "这项操作已经完成。"],
   badPass: ["That pass is invalid.", "凭证无效。"],
-  blocked: ["Contact is blocked.", "联系已被屏蔽。"],
+  refresh: ["Refresh to use public discussions.", "请刷新页面进入公开讨论。"],
   muted: ["The host has muted this account.", "主持人已将此账户静音。"],
   offline: ["Reconnecting to the café…", "正在重新连接咖啡馆…"],
   speaker: ["Only the current speaker can do that.", "只有当前讲者可以操作。"],
@@ -350,17 +353,20 @@ function cardForm() {
 function proposal(c) {
   gate(() =>
     modal(
-      t("Offer to help", "我可以帮忙"),
+      t("Offer to help publicly", "公开提出合作"),
       [
         {
           key: "text",
-          label: t("One concrete thing you can do", "你能完成的一件具体事情"),
+          label: t(
+            "What can you help with? Everyone here can read your proposal.",
+            "你能帮上什么忙？咖啡馆里的每个人都能看到这条提议。",
+          ),
           max: 240,
           long: true,
         },
       ],
-      t("Send proposal", "发送提议"),
-      (d) => act("propose", { ...d, id: c.id }),
+      t("Post publicly", "公开发表"),
+      (d) => act("proposePublic", { ...d, id: c.id }),
     ),
   );
 }
@@ -456,18 +462,22 @@ function paintLabels() {
   $("language").value = language;
   const labels = {
     roomNav: t("Coffee room", "咖啡厅"),
-    inboxNav: t("My connections", "我的合作"),
+    inboxNav: t("Open discussions", "公开讨论"),
     roomTitle: t("The coffee room", "创业咖啡馆"),
     floorTitle: t("Café floor", "咖啡馆座位"),
     view: list ? t("View floor", "查看场景") : t("Seat list", "座位列表"),
     stageLabel: t("The stage", "开放讲台"),
     chatNav: t("Chat", "聊天"),
-    chatTitle: t("Café chat", "大厅聊天"),
+    chatTitle: t("Public café chat", "大厅公开聊天"),
+    discussionHint: t(
+      "Everyone in the café can read proposals and join the discussion.",
+      "合作提议对全场可见，旁听的朋友也可以回复。",
+    ),
     showFloor: t("View café floor", "看座位区"),
     chatSend: t("Send", "发送"),
     transcriptTitle: t("Stage conversation", "讲台交流"),
     cardTitle: t("Collaboration board", "合作黑板"),
-    inboxTitle: t("My connections", "我的合作"),
+    inboxTitle: t("Open discussions", "公开讨论"),
     sendLine: t("Send", "发送"),
     footerState: t("Closed trial", "封闭内测"),
   };
@@ -562,14 +572,16 @@ function paintBubbles() {
     latest = new Map();
   const now = Date.now() / 1000 + offset;
   if (online && page === "room" && !list) {
-    const blocked = new Set(
-      room.offers
-        .filter((o) => o.blocked)
-        .map((o) => (o.from === room.me ? o.owner : o.from)),
-    );
-    for (const line of [...(room.chat || []), ...(room.stage?.lines || [])]) {
+    const speech = [...(room.chat || []), ...(room.stage?.lines || [])];
+    for (const o of room.discussions || []) {
+      if (o.updated <= now - bubbleLifetime) continue;
+      speech.push({ who: o.from, at: o.at, text: o.text, lang: o.lang });
+      for (const message of o.messages) {
+        if (message.at > now - bubbleLifetime) speech.push(message);
+      }
+    }
+    for (const line of speech) {
       if (
-        !blocked.has(line.who) &&
         line.at > now - bubbleLifetime &&
         (!latest.has(line.who) || line.at >= latest.get(line.who).at)
       )
@@ -641,8 +653,8 @@ function paintBubbles() {
 function paintFloor() {
   const n = room.seats.filter(Boolean).length;
   $("roomInfo").textContent = t(
-    "One shared stage · 15-minute talks",
-    "一个开放讲台 · 每段分享 15 分钟",
+    "Share what you’re building. Everyone here can read and join the conversation.",
+    "聊聊你正在做的项目。每个人都能看到你的分享，也可以加入讨论。",
   );
   $("seatCount").textContent = t(n + " / 50 seated", n + " / 50 已入座");
   $("floorHint").textContent = t(
@@ -1005,25 +1017,29 @@ function paintCards() {
 function paintInbox() {
   const box = $("inbox");
   box.replaceChildren();
-  if (!room.offers.length)
+  const discussions = room.discussions || [];
+  if (!discussions.length)
     box.append(
       el(
         "p",
         t(
-          "Your private proposals and accepted conversations appear here.",
-          "你的私人合作提议和已接受的对话会显示在这里。",
+          "No proposals yet. Choose a collaboration card in the coffee room to offer help.",
+          "还没有提议。在咖啡厅的合作黑板上选一张卡，就能公开提出合作。",
         ),
         "empty",
       ),
     );
-  for (const o of [...room.offers].reverse()) {
+  for (const o of [...discussions].reverse()) {
     const c = el("article", "", "panel inbox-card"),
-      owner = o.owner === room.me;
+      owner = o.owner === room.me,
+      author = o.from === room.me;
     c.append(
       el("h2", o.name),
       el(
         "small",
-        name(owner ? o.from : o.owner) +
+        name(o.from) +
+          t(" offered to help ", " 提议协助 ") +
+          name(o.owner) +
           " · " +
           {
             pending: t("Pending", "待处理"),
@@ -1037,70 +1053,63 @@ function paintInbox() {
     for (const m of o.messages)
       c.append(el("strong", name(m.who)), trans(m.text, m.lang));
     const a = el("div", "", "actions");
-    if (!o.blocked) {
-      if (o.status === "pending")
-        for (const [k, label] of owner
-          ? [
-              ["accept", t("Accept", "接受")],
-              ["decline", t("Decline", "婉拒")],
-            ]
-          : [["withdraw", t("Withdraw", "撤回")]])
-          a.append(btn(label, () => act(k, { id: o.id })));
-      if (o.status === "accepted")
-        a.append(
-          btn(t("Write privately", "写私信"), () =>
-            modal(
-              t("Private message", "私信"),
-              [
-                {
-                  key: "text",
-                  label: t("Next step", "下一步"),
-                  max: 600,
-                  long: true,
-                },
-              ],
-              t("Send", "发送"),
-              (d) => act("message", { ...d, id: o.id }),
-            ),
-          ),
-        );
-      if (o.status === "accepted") {
-        const confirmations = Object.keys(o.confirmed || {}).length;
-        a.append(
-          el(
-            "small",
-            t("Next step confirmed: ", "已确认具体下一步：") +
-              confirmations +
-              "/2",
-          ),
-        );
-        if (!o.confirmed?.[room.me])
-          a.append(
-            btn(t("Confirm a next step", "确认已约定下一步"), () =>
-              act("nextStep", { id: o.id }),
-            ),
-          );
+    if (o.status === "pending") {
+      if (owner) {
+        a.append(btn(t("Accept", "接受"), () => act("accept", { id: o.id })));
+        a.append(btn(t("Decline", "婉拒"), () => act("decline", { id: o.id })));
       }
+      if (author)
+        a.append(
+          btn(t("Withdraw", "撤回"), () => act("withdraw", { id: o.id })),
+        );
+    }
+    if (o.status === "pending" || o.status === "accepted")
       a.append(
-        btn(
-          t("Block contact", "屏蔽联系"),
-          () =>
-            ask(
-              t("Block further contact?", "屏蔽对方后续联系？"),
-              t("Block", "屏蔽"),
-              () => act("block", { id: o.id }),
-            ),
-          "small",
+        btn(t("Reply publicly", "公开回复"), () =>
+          modal(
+            t("Reply to the café", "回复全场"),
+            [
+              {
+                key: "text",
+                label: t(
+                  "Everyone in the café can read this reply.",
+                  "咖啡馆里的每个人都能看到这条回复。",
+                ),
+                max: 600,
+                long: true,
+              },
+            ],
+            t("Post publicly", "公开发表"),
+            (d) => act("replyPublic", { ...d, id: o.id }),
+          ),
         ),
       );
-    } else a.append(el("small", t("Contact blocked", "已屏蔽")));
+    if (o.status === "accepted") {
+      a.append(
+        el(
+          "small",
+          t("Next step confirmed: ", "已确认具体下一步：") +
+            Object.keys(o.confirmed || {}).length +
+            "/2",
+        ),
+      );
+      if ((owner || author) && !o.confirmed?.[room.me])
+        a.append(
+          btn(t("Confirm a next step", "确认已约定下一步"), () =>
+            act("nextStep", { id: o.id }),
+          ),
+        );
+    }
     c.append(a);
     box.append(c);
   }
   for (const r of room.reports.filter((r) => !r.closed)) {
     const c = el("article", "", "panel inbox-card");
     c.append(
-      el("strong", t("Report about ", "举报对象 ") + name(r.who)),
+      el(
+        "strong",
+        t("Host-only report about ", "仅主持人可见的举报 · ") + name(r.who),
+      ),
       el("p", r.reason),
     );
     for (const [op, label] of [

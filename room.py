@@ -57,14 +57,23 @@ class Room:
             )
         return self.db["people"][who]
 
-    def resume_listeners(self, seats, observed):
-        """Give known seats their usual reconnect grace during an idle-room update."""
+    def resume_listeners(self, seats, observed, chat=()):
+        """Restore the idle room’s lobby history and give seated listeners time to reconnect."""
         if not 0 <= self.clock() - observed < GRACE or len(seats) != len(self.seats):
             return
         for i, who in enumerate(seats):
             if who is not None and who in self.db["people"] and who not in self.seats:
                 self.seats[i] = who
                 self.gone[who] = observed
+
+        for line in chat[-80:]:
+            if line["who"] not in self.db["people"]:
+                continue
+            item = {key: line[key] for key in ("who", "text", "lang")}
+            item.update(id=line.get("id") or uid(), at=line.get("at", 0))
+            if line.get("visibility") == "public":
+                item["visibility"] = "public"
+            self.chat.append(item)
 
     def join(self, who):
         self.tick()
@@ -183,6 +192,7 @@ class Room:
         self.tick()
         p = self.person(who)
         ishost = p["role"] == "host"
+        check(kind not in ("propose", "message", "block"), "refresh")
         if kind not in (
             "profile",
             "speakLang",
@@ -192,6 +202,7 @@ class Room:
             "claimSeat",
             "gesture",
             "chat",
+            "replyPublic",
             "report",
         ):
             check(p["role"] != "guest", "pass")
@@ -200,8 +211,8 @@ class Room:
             "confirm",
             "say",
             "chat",
-            "propose",
-            "message",
+            "proposePublic",
+            "replyPublic",
             "openCard",
         ):
             check(not p["muted"], "muted")
@@ -322,7 +333,14 @@ class Room:
         elif kind == "chat":
             text = field(d, "text", 600)
             self.chat.append(
-                dict(id=uid(), who=who, text=text, lang=p["lang"], at=self.clock())
+                dict(
+                    id=uid(),
+                    who=who,
+                    text=text,
+                    lang=p["lang"],
+                    at=self.clock(),
+                    visibility="public",
+                )
             )
             self.chat = self.chat[-80:]
         elif kind == "say":
@@ -389,7 +407,7 @@ class Room:
             c = self.db["cards"].get(d.get("id"))
             check(c and (c["owner"] == who or ishost), "private")
             c["open"] = False
-        elif kind == "propose":
+        elif kind == "proposePublic":
             c = self.db["cards"].get(d.get("id"))
             check(
                 c
@@ -401,7 +419,8 @@ class Room:
             )
             check(
                 not any(
-                    o["card"] == c["id"]
+                    o.get("visibility") == "public"
+                    and o["card"] == c["id"]
                     and o["from"] == who
                     and o["status"] in ("pending", "accepted")
                     for o in self.db["offers"].values()
@@ -412,6 +431,8 @@ class Room:
             self.db["offers"][key] = dict(
                 id=key,
                 card=c["id"],
+                visibility="public",
+                at=self.clock(),
                 name=c["title"],
                 owner=c["owner"],
                 **{"from": who},
@@ -421,39 +442,33 @@ class Room:
                 updated=self.clock(),
                 messages=[],
             )
-        elif kind in ("accept", "decline", "withdraw", "message", "block", "nextStep"):
+        elif kind in ("accept", "decline", "withdraw", "replyPublic", "nextStep"):
             o = self.db["offers"].get(d.get("id"))
-            check(o and who in (o["owner"], o["from"]), "private")
-            other = o["from"] if o["owner"] == who else o["owner"]
-            if kind == "block":
-                if not self.blocked(who, other):
-                    self.db["blocks"].append([who, other])
+            check(o and o.get("visibility") == "public", "closed")
+            if kind == "replyPublic":
+                check(o["status"] in ("pending", "accepted"), "closed")
+                o["messages"].append(
+                    dict(
+                        who=who,
+                        text=field(d, "text", 600),
+                        lang=p["lang"],
+                        at=self.clock(),
+                    )
+                )
+            elif kind == "nextStep":
+                check(who in (o["owner"], o["from"]), "private")
+                check(o["status"] == "accepted", "closed")
+                o.setdefault("confirmed", {})[who] = self.clock()
             else:
-                check(not self.blocked(who, other), "blocked")
-                if kind == "nextStep":
-                    check(o["status"] == "accepted", "private")
-                    o.setdefault("confirmed", {})[who] = self.clock()
-                elif kind == "message":
-                    check(o["status"] == "accepted", "private")
-                    o["messages"].append(
-                        dict(
-                            who=who,
-                            text=field(d, "text", 600),
-                            lang=p["lang"],
-                            at=self.clock(),
-                        )
-                    )
-                else:
-                    check(o["status"] == "pending", "closed")
-                    check(
-                        who == (o["from"] if kind == "withdraw" else o["owner"]),
-                        "private",
-                    )
-                    o["status"] = {
-                        "accept": "accepted",
-                        "decline": "declined",
-                        "withdraw": "withdrawn",
-                    }[kind]
+                check(
+                    who == (o["from"] if kind == "withdraw" else o["owner"]), "private"
+                )
+                check(o["status"] == "pending", "closed")
+                o["status"] = {
+                    "accept": "accepted",
+                    "decline": "declined",
+                    "withdraw": "withdrawn",
+                }[kind]
             o["updated"] = self.clock()
         elif kind == "report":
             target = d.get("who")
@@ -531,18 +546,21 @@ class Room:
         s = self.stage
         p = self.person(who)
         cards = list(self.db["cards"].values())
-        offers = [
-            dict(o, blocked=self.blocked(o["owner"], o["from"]))
-            for o in self.db["offers"].values()
-            if who in (o["from"], o["owner"])
+        discussions = [
+            o for o in self.db["offers"].values() if o.get("visibility") == "public"
         ]
-        chat = [line for line in self.chat if not self.blocked(who, line["who"])]
+        chat = [
+            line
+            for line in self.chat
+            if line.get("visibility") == "public" or not self.blocked(who, line["who"])
+        ]
         people = {who, *[x for x in self.seats if x], *(line["who"] for line in chat)}
         if s:
             people.update([s["who"], *[x["who"] for x in s["lines"]]])
         people.update(c["owner"] for c in cards)
-        for o in offers:
+        for o in discussions:
             people.update((o["from"], o["owner"]))
+            people.update(m["who"] for m in o["messages"])
         reports = self.db["reports"] if p["role"] == "host" else []
         people.update(r["who"] for r in reports)
         public = {
@@ -582,7 +600,8 @@ class Room:
             ),
             queued=len(self.queue) + int(bool(self.call)),
             cards=cards,
-            offers=offers,
+            offers=[],  # Older clients label this field private. Never deliver public posts there.
+            discussions=discussions,
             reports=reports,
             effects=self.effects,
         )

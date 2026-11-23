@@ -6,7 +6,7 @@
   "English talk and Chinese question cross two clients with real local translations",
   "Synthetic microphone through browser capture, authenticated relay, listener playback scheduling and live speech caption",
   "Speaker correction retranslated from revised source in the second browser",
-  "Private invitation accepted, bilateral message and next step persisted after reload; third visitor saw no thread",
-  "Stage text and seated questions used distinct anchors; private offer messages never entered bubbles. A fresh bubble expired while its original stayed in chat.",
+  "A third unseated visitor read the pending public proposal, replied before acceptance and saw the accepted thread and avatar speech. Replies reached both other identities. Only the two collaborators confirmed the next step. Reload preserved the thread.",
+  "Stage text and seated questions used distinct anchors; A fresh bubble expired while its original stayed in chat.",
   "Mobile 390px without horizontal overflow; handoff clears old stage; no page exceptions"
 ]
