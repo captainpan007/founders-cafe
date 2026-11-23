@@ -43,6 +43,7 @@ class Room:
         self.held, self.call, self.stage = None, None, None
         self.online, self.gone, self.effects = set(), {}, {}
         self.rev = 0
+        self.chat = []
 
     def person(self, who, role="guest"):
         if who not in self.db["people"]:
@@ -55,6 +56,15 @@ class Room:
                 muted=False,
             )
         return self.db["people"][who]
+
+    def resume_listeners(self, seats, observed):
+        """Give known seats their usual reconnect grace during an idle-room update."""
+        if not 0 <= self.clock() - observed < GRACE or len(seats) != len(self.seats):
+            return
+        for i, who in enumerate(seats):
+            if who is not None and who in self.db["people"] and who not in self.seats:
+                self.seats[i] = who
+                self.gone[who] = observed
 
     def join(self, who):
         self.tick()
@@ -181,10 +191,19 @@ class Room:
             "wait",
             "claimSeat",
             "gesture",
+            "chat",
             "report",
         ):
             check(p["role"] != "guest", "pass")
-        if kind in ("apply", "confirm", "say", "propose", "message", "openCard"):
+        if kind in (
+            "apply",
+            "confirm",
+            "say",
+            "chat",
+            "propose",
+            "message",
+            "openCard",
+        ):
             check(not p["muted"], "muted")
         s = self.stage
         if kind in ("end", "say", "vote", "mic", "openCard", "editLine", "answer"):
@@ -300,6 +319,10 @@ class Room:
             s["votes"].add(who)
         elif kind == "mic":
             s["mic"] = d.get("on") is True
+        elif kind == "chat":
+            text = field(d, "text", 600)
+            self.chat.append(dict(who=who, text=text, lang=p["lang"]))
+            self.chat = self.chat[-80:]
         elif kind == "say":
             check(who == s["who"] or who in self.seats, "seat")
             self.line(
@@ -511,7 +534,8 @@ class Room:
             for o in self.db["offers"].values()
             if who in (o["from"], o["owner"])
         ]
-        people = {who, *[x for x in self.seats if x]}
+        chat = [line for line in self.chat if not self.blocked(who, line["who"])]
+        people = {who, *[x for x in self.seats if x], *(line["who"] for line in chat)}
         if s:
             people.update([s["who"], *[x["who"] for x in s["lines"]]])
         people.update(c["owner"] for c in cards)
@@ -543,6 +567,7 @@ class Room:
             me=who,
             role=p["role"],
             seats=self.seats,
+            chat=chat,
             people=public,
             stage=stage,
             reserved=self.held["seat"] if self.held else None,

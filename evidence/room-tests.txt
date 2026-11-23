@@ -1,11 +1,14 @@
 test_live_room_at_capacity (test_network.NetworkTrial.test_live_room_at_capacity) ... ok
 test_budget_field_and_caption_correction (test_room.RoomCases.test_budget_field_and_caption_correction) ... ok
 test_capacity_race_and_fifo (test_room.RoomCases.test_capacity_race_and_fifo) ... ok
+test_chat_history_limit_and_block (test_room.RoomCases.test_chat_history_limit_and_block) ... ok
+test_chat_is_open_without_a_seat_and_separate_from_stage (test_room.RoomCases.test_chat_is_open_without_a_seat_and_separate_from_stage) ... ok
 test_drop_speaker (test_room.RoomCases.test_drop_speaker) ... ok
 test_eligible_snapshot (test_room.RoomCases.test_eligible_snapshot) ... ok
 test_exactly_ten_and_late (test_room.RoomCases.test_exactly_ten_and_late) ... ok
 test_fully_occupied_handoff (test_room.RoomCases.test_fully_occupied_handoff) ... ok
 test_grace (test_room.RoomCases.test_grace) ... ok
+test_idle_update_keeps_seats_for_reconnecting_guests (test_room.RoomCases.test_idle_update_keeps_seats_for_reconnecting_guests) ... ok
 test_moderation (test_room.RoomCases.test_moderation) ... ok
 test_private_accept_block_retention (test_room.RoomCases.test_private_accept_block_retention) ... ok
 test_queue_timeout_and_handoff (test_room.RoomCases.test_queue_timeout_and_handoff) ... ok
@@ -14,6 +17,6 @@ test_single_writer_and_restart (test_room.RoomCases.test_single_writer_and_resta
 test_two_extensions_and_duplicate (test_room.RoomCases.test_two_extensions_and_duplicate) ... ok
 
 ----------------------------------------------------------------------
-Ran 14 tests in 1.197s
+Ran 17 tests in 1.178s
 
 OK

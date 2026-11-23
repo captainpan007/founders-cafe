@@ -1,5 +1,7 @@
 [
+  "Unseated guest submitted Chinese by Enter before any talk; a second Chrome context received its translation",
   "Two participants and a third observer see the same seats",
+  "Guest chat stayed open during a talk and remained separate from stage questions",
   "English talk and Chinese question cross two clients with real local translations",
   "Synthetic microphone through browser capture, authenticated relay, listener playback scheduling and live speech caption",
   "Speaker correction retranslated from revised source in the second browser",

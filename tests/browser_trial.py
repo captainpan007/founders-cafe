@@ -143,13 +143,44 @@ def main():
                     u.goto(invite)
                     v.goto(url)
                     expect(u.locator("#take")).to_have_text("Take a seat")
+                    v.locator("#chatNav").click()
+                    chat_input = v.locator("#chatText")
+                    expect(chat_input).to_be_focused()
+                    expect(chat_input).to_be_editable()
+                    v.locator("#language").select_option("zh")
+                    v.locator("#sourceLang").select_option("zh")
+                    chat_request = v.expect_response(
+                        lambda r: (
+                            "/api/action" in r.url
+                            and r.request.post_data_json.get("action") == "chat"
+                        )
+                    )
+                    chat_input.fill("大家")
+                    chat_input.dispatch_event("compositionstart")
+                    v.locator("#chatForm").evaluate("form => form.requestSubmit()")
+                    expect(v.locator("#chatLog article")).to_have_count(0)
+                    expect(chat_input).to_have_value("大家")
+                    chat_input.dispatch_event("compositionend")
+                    chat_input.fill("大家好")
+                    with chat_request:
+                        chat_input.press("Enter")
+                    expect(v.locator("#chatLog article")).to_have_count(1)
+                    expect(v.locator("#chatLog")).to_contain_text("大家好")
+                    expect(
+                        h.locator("#chatLog .translation > span").first
+                    ).to_contain_text(re.compile("[a-zA-Z]"), timeout=30000)
+                    expect(chat_input).to_have_value("")
+                    expect(v.locator("#take")).to_have_text("找个座位")
+                    evidence.append(
+                        "Unseated guest submitted Chinese by Enter before any talk; a second Chrome context received its translation"
+                    )
                     u.locator("#language").select_option("zh")
                     u.locator("#profile").click()
                     fill(u, name="小林", tag="设计师", lang="zh")
                     submit(u)
                     h.locator("#take").click()
                     u.locator("#take").click()
-                    expect(v.locator("#seatCount")).to_have_text("2 / 50 seated")
+                    expect(v.locator("#seatCount")).to_have_text("2 / 50 已入座")
                     evidence.append(
                         "Two participants and a third observer see the same seats"
                     )
@@ -162,6 +193,15 @@ def main():
                     submit(h)
                     h.get_by_role("button", name="Confirm — take the stage").click()
                     expect(u.locator("#stageState")).to_have_text("分享中")
+                    chat_input.fill("分享时也可以在大厅聊天")
+                    v.locator("#chatSend").click()
+                    expect(v.locator("#chatLog article")).to_have_count(2)
+                    expect(h.locator("#lines")).not_to_contain_text(
+                        "分享时也可以在大厅聊天"
+                    )
+                    evidence.append(
+                        "Guest chat stayed open during a talk and remained separate from stage questions"
+                    )
                     h.locator("#sayText").fill("We have three paying customers.")
                     h.locator("#sendLine").click()
                     expect(

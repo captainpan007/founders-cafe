@@ -17,6 +17,7 @@
         >
         <nav>
           <button id="roomNav" class="nav active"></button
+          ><button id="chatNav" class="nav"></button
           ><button id="inboxNav" class="nav"></button>
         </nav>
         <div class="right">
@@ -65,28 +66,42 @@
           </aside>
         </div>
         <div class="lower">
-          <section class="panel stream">
-            <div class="map-head">
-              <h2 id="transcriptTitle"></h2>
-              <div class="row">
-                <button id="fontSize" class="small">A+</button
-                ><button id="sound" class="small"></button>
-              </div>
-            </div>
-            <div id="lines"></div>
-            <form id="sayForm">
+          <section class="panel stream" id="chat">
+            <div class="map-head"><h2 id="chatTitle"></h2></div>
+            <div id="chatLog"></div>
+            <form id="chatForm">
               <select
                 id="sourceLang"
                 class="field"
                 aria-label="Speaking and writing language"
               >
                 <option value="en">EN</option>
-                <option value="zh">中文</option></select
-              ><input id="sayText" maxlength="600" autocomplete="off" /><button
-                id="sendLine"
+                <option value="zh">中文</option>
+              </select>
+              <input id="chatText" maxlength="600" autocomplete="off" />
+              <button
+                id="chatSend"
                 class="primary"
+                type="submit"
+                disabled
               ></button>
             </form>
+            <div id="talkStream" hidden>
+              <div class="map-head">
+                <h2 id="transcriptTitle"></h2>
+                <div class="row">
+                  <button id="fontSize" class="small">A+</button
+                  ><button id="sound" class="small"></button>
+                </div>
+              </div>
+              <div id="lines"></div>
+              <form id="sayForm">
+                <input id="sayText" maxlength="600" autocomplete="off" /><button
+                  id="sendLine"
+                  class="primary"
+                ></button>
+              </form>
+            </div>
           </section>
           <section class="panel collaboration">
             <h2 id="cardTitle"></h2>

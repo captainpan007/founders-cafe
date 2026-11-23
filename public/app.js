@@ -461,7 +461,10 @@ function paintLabels() {
     floorTitle: t("Café floor", "咖啡馆座位"),
     view: list ? t("View floor", "查看场景") : t("Seat list", "座位列表"),
     stageLabel: t("The stage", "开放讲台"),
-    transcriptTitle: t("Live conversation", "现场交流"),
+    chatNav: t("Chat", "聊天"),
+    chatTitle: t("Café chat", "大厅聊天"),
+    chatSend: t("Send", "发送"),
+    transcriptTitle: t("Stage conversation", "讲台交流"),
     cardTitle: t("Collaboration board", "合作黑板"),
     inboxTitle: t("My connections", "我的合作"),
     sendLine: t("Send", "发送"),
@@ -478,6 +481,12 @@ function paintLabels() {
   $("connection").textContent = online
     ? ""
     : t("Connecting to the café…", "正在连接咖啡馆…");
+  $("chatText").placeholder = t("Say hello to the room…", "跟大家打个招呼…");
+  $("chatText").setAttribute(
+    "aria-label",
+    t("Message to the café", "写给大厅的消息"),
+  );
+  $("chatSend").disabled = !online || sendingChat;
   $("roomPage").hidden = page !== "room";
   $("inboxPage").hidden = page !== "inbox";
   $("roomNav").classList.toggle("active", page === "room");
@@ -683,7 +692,34 @@ document.body.classList.toggle(
   "big-type",
   localStorage.getItem("cafe-big") === "1",
 );
+function paintChat() {
+  const box = $("chatLog");
+  const follow = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+  box.replaceChildren();
+  const lines = room.chat || [];
+  if (!lines.length)
+    box.append(
+      el(
+        "p",
+        t(
+          "Say hello. Everyone in the café can join in.",
+          "这里的人都能看到你发的消息。",
+        ),
+        "empty",
+      ),
+    );
+  for (const line of lines) {
+    const row = el("article", "", "entry");
+    row.append(
+      btn(name(line.who), () => person(line.who), "chat-author"),
+      trans(line.text, line.lang),
+    );
+    box.append(row);
+  }
+  if (follow) box.scrollTop = box.scrollHeight;
+}
 function paintLines() {
+  $("talkStream").hidden = !room.stage;
   $("sourceLang").value = room.people[room.me].lang;
   $("sourceLang").title = t("I speak and write in", "我说话和书写的语言");
   $("fontSize").title = t("Change caption size", "调整字幕字号");
@@ -943,6 +979,7 @@ function paint() {
   if (page === "room") {
     paintFloor();
     paintStage();
+    paintChat();
     paintLines();
     paintCards();
   } else paintInbox();
@@ -950,6 +987,12 @@ function paint() {
 $("roomNav").onclick = () => {
   page = "room";
   paint();
+};
+$("chatNav").onclick = () => {
+  page = "room";
+  paint();
+  $("chat").scrollIntoView({ block: "center" });
+  $("chatText").focus({ preventScroll: true });
 };
 $("inboxNav").onclick = () => {
   page = "inbox";
@@ -973,6 +1016,42 @@ $("sound").onclick = async () => {
     paintLines();
   } catch (e) {
     notice(errorText(e));
+  }
+};
+let sendingChat = false;
+const chatInput = $("chatText");
+let composing = false;
+chatInput.addEventListener("compositionstart", () => {
+  composing = true;
+});
+chatInput.addEventListener("compositionend", () => {
+  composing = false;
+});
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.isComposing || composing || e.keyCode === 229)) {
+    // Leave IME candidate selection to the browser, suppress only implicit submit.
+    skipImeSubmit = true;
+    setTimeout(() => {
+      skipImeSubmit = false;
+    }, 0);
+  }
+});
+let skipImeSubmit = false;
+$("chatForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = chatInput.value;
+  if (composing || skipImeSubmit || sendingChat || !text.trim()) return;
+  if (!online) return notice(errorText(new Error("offline")));
+  sendingChat = true;
+  $("chatSend").disabled = true;
+  try {
+    await act("chat", { text });
+    if (chatInput.value === text) chatInput.value = "";
+  } catch (err) {
+    notice(errorText(err));
+  } finally {
+    sendingChat = false;
+    $("chatSend").disabled = !online;
   }
 };
 $("sayForm").onsubmit = (e) => {

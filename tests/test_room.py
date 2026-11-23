@@ -226,6 +226,45 @@ class RoomCases(unittest.TestCase):
         )
         self.assertEqual(s["lines"][0]["text"], "Python")
 
+    def test_chat_is_open_without_a_seat_and_separate_from_stage(self):
+        self.add("visitor", role="guest")
+        self.act("visitor", "speakLang", lang="zh")
+        self.act("visitor", "chat", text="你好")
+        self.assertEqual(self.r.view("visitor")["chat"][0]["lang"], "zh")
+        stage = self.start()
+        self.act("visitor", "chat", text="Hello again")
+        self.assertFalse(stage["lines"])
+        with self.assertRaises(Rule):
+            self.act("visitor", "say", stage=stage["id"], text="Question")
+        self.r.person("visitor")["muted"] = True
+        with self.assertRaises(Rule):
+            self.act("visitor", "chat", text="Muted")
+        self.assertNotIn("chat", self.r.db)
+
+    def test_chat_history_limit_and_block(self):
+        self.add("a")
+        self.add("b")
+        for i in range(81):
+            self.act("a", "chat", text=str(i))
+        self.assertEqual(len(self.r.view("b")["chat"]), 80)
+        self.assertEqual(self.r.view("b")["chat"][0]["text"], "1")
+        self.r.db["blocks"].append(["b", "a"])
+        self.assertFalse(self.r.view("b")["chat"])
+
+    def test_idle_update_keeps_seats_for_reconnecting_guests(self):
+        self.add("guest", 4, "guest")
+        saved = self.r.seats.copy()
+        restarted = Room(self.r.db, clock=lambda: self.ts)
+        restarted.resume_listeners(saved, self.ts)
+        self.ts += 10
+        restarted.join("guest")
+        self.ts += 60
+        restarted.tick()
+        self.assertEqual(restarted.seats[4], "guest")
+        fresh = Room(self.r.db, clock=lambda: self.ts)
+        fresh.resume_listeners(saved, self.ts - 61)
+        self.assertNotIn("guest", fresh.seats)
+
     def test_single_writer_and_restart(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d)

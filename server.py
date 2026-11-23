@@ -204,6 +204,8 @@ class Cafe:
             if request_id in seen:
                 check(seen[request_id] == fingerprint, "invalid")
                 return web.json_response({"ok": True})
+        if kind == "chat":
+            self.limited(("chat", who), 8, 10)
         transitioned = self.room.tick()
         try:
             self.room.action(who, kind, data)
@@ -498,6 +500,10 @@ if __name__ == "__main__":
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(args.cert, args.tls_key)
     c = Cafe(args.data, extra_host=args.private_ip)
+    handoff = os.environ.pop("CAFE_IDLE_RESTART_SEATS", "")
+    if handoff:
+        snapshot = json.loads(handoff)
+        c.room.resume_listeners(snapshot["seats"], snapshot["observed"])
     hostfile = args.data / "host-pass"
     if not hostfile.exists():
         atomic(hostfile, c.sign("invite", secrets.token_hex(16), "host"))
