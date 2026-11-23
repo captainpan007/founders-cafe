@@ -83,7 +83,6 @@ async def bench():
                 title="Founder conversations",
                 goal="Discuss one real next step",
             )
-            await action(host, "confirm")
             st = (await until(lambda d: d["stage"]))["id"]
             await action(host, "mic", stage=st, on=True)
             for idx, (src, text) in enumerate(CASES):

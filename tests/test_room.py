@@ -23,7 +23,6 @@ class RoomCases(unittest.TestCase):
     def start(self):
         self.add("speaker", 0)
         self.act("speaker", "apply", title="Local founders", goal="One useful lesson")
-        self.act("speaker", "confirm")
         return self.r.stage
 
     def audience(self, n):
@@ -92,9 +91,28 @@ class RoomCases(unittest.TestCase):
         self.ts += ROUND - WINDOW
         self.r.tick()
         self.add("late", 3)
-        for who in ("speaker", "guest", "late"):
+        self.vote(s, "guest")
+        self.assertIn("guest", s["votes"])
+        for who in ("speaker", "late"):
             with self.assertRaises(Rule):
                 self.vote(s, who)
+
+    def test_visitors_raise_hands_without_seats_and_wait_their_turn(self):
+        self.add("one", role="guest")
+        self.add("two", role="guest")
+        self.act("one", "apply", title="Meet the founders")
+        stage = self.r.stage["id"]
+        self.assertFalse(self.r.stage["mic"])
+        self.act("one", "say", stage=stage, text="Welcome")
+        self.act("two", "apply", title="My first project")
+        self.assertEqual(self.r.view("two")["position"], 1)
+        with self.assertRaises(Rule):
+            self.act("two", "confirm")
+        self.act("one", "end", stage=stage)
+        self.assertTrue(self.r.view("two")["called"])
+        self.act("two", "confirm")
+        self.assertEqual(self.r.stage["who"], "two")
+        self.assertIsNone(self.r.seats_for("two"))
 
     def test_queue_timeout_and_handoff(self):
         s = self.start()

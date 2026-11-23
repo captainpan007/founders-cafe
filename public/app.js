@@ -89,10 +89,6 @@ const name = (id) => room?.people[id]?.name || t("Guest", "访客");
 const mine = () => room?.stage?.who === room?.me;
 const sitting = () => room?.seats.indexOf(room.me) ?? -1;
 const stageData = () => ({ stage: room?.stage?.id });
-function gate(fn) {
-  if (room.role === "guest") passDialog();
-  else fn();
-}
 function modal(title, fields, submit, run, notes = "") {
   $("dialogTitle").textContent = title;
   $("dialogBody").replaceChildren();
@@ -139,30 +135,6 @@ $("dialogForm").onsubmit = async (e) => {
     $("dialogSave").disabled = false;
   }
 };
-function passDialog() {
-  modal(
-    t("Participant pass", "参与凭证"),
-    [
-      {
-        key: "pass",
-        label: t("Paste your invitation link or pass", "粘贴邀请链接或凭证"),
-        max: 500,
-      },
-    ],
-    t("Join", "加入"),
-    async (d) => {
-      let token = d.pass.trim();
-      if (token.includes("#"))
-        token = new URLSearchParams(token.split("#")[1]).get("pass") || "";
-      await post("/api/enter", { pass: token });
-      location.reload();
-    },
-    t(
-      "Listening is open to everyone. The host issues one reusable pass per participant for the closed trial.",
-      "所有人都可以旁听。内测主持人为每人发一枚可重复使用的凭证。",
-    ),
-  );
-}
 function profile() {
   if (!room) return;
   const p = room.people[room.me],
@@ -200,29 +172,6 @@ function profile() {
         ),
       );
   }
-  if (room.role === "guest")
-    extra.append(btn(t("Use a participant pass", "使用参与凭证"), passDialog));
-  if (room.role === "host")
-    extra.append(
-      btn(t("Create participant invitation", "生成参与者邀请"), async () => {
-        const v = await act("invite");
-        const input = el("input");
-        input.readOnly = true;
-        input.value = location.origin + "/#pass=" + v.pass;
-        input.style.width = "100%";
-        extra.replaceChildren(
-          el(
-            "p",
-            t(
-              "Private invitation for one participant.",
-              "仅交给一位参与者的私人邀请。",
-            ),
-          ),
-          input,
-        );
-        input.select();
-      }),
-    );
   modal(
     t("My café profile", "我的咖啡馆名片"),
     [
@@ -286,30 +235,18 @@ function person(id) {
   modal(p.name, [], "", null, extra);
 }
 function apply() {
-  gate(() =>
-    modal(
-      t("Request the stage", "申请上台"),
-      [
-        { key: "title", label: t("Talk title", "分享题目"), max: 90 },
-        {
-          key: "goal",
-          label: t("What will people take away?", "听完能带走什么？"),
-          max: 180,
-          long: true,
-        },
-        {
-          key: "terms",
-          label: t(
-            "Names or project terms for captions (optional)",
-            "字幕参考人名或项目名（选填）",
-          ),
-          max: 100,
-          req: false,
-        },
-      ],
-      t("Join speaker queue", "加入讲者队列"),
-      (d) => act("apply", d),
-    ),
+  const queued = !!(room.stage || room.queued);
+  modal(
+    t("Share with the café", "我想分享"),
+    [
+      {
+        key: "title",
+        label: t("What would you like to talk about?", "你想聊什么？"),
+        max: 90,
+      },
+    ],
+    queued ? t("Join the queue", "加入队列") : t("Start sharing", "开始分享"),
+    (d) => act("apply", d),
   );
 }
 function cardForm() {
@@ -351,23 +288,21 @@ function cardForm() {
   );
 }
 function proposal(c) {
-  gate(() =>
-    modal(
-      t("Offer to help publicly", "公开提出合作"),
-      [
-        {
-          key: "text",
-          label: t(
-            "What can you help with? Everyone here can read your proposal.",
-            "你能帮上什么忙？咖啡馆里的每个人都能看到这条提议。",
-          ),
-          max: 240,
-          long: true,
-        },
-      ],
-      t("Post publicly", "公开发表"),
-      (d) => act("proposePublic", { ...d, id: c.id }),
-    ),
+  modal(
+    t("Offer to help publicly", "公开提出合作"),
+    [
+      {
+        key: "text",
+        label: t(
+          "What can you help with? Everyone here can read your proposal.",
+          "你能帮上什么忙？咖啡馆里的每个人都能看到这条提议。",
+        ),
+        max: 240,
+        long: true,
+      },
+    ],
+    t("Post publicly", "公开发表"),
+    (d) => act("proposePublic", { ...d, id: c.id }),
   );
 }
 function ask(text, button, fn) {
@@ -479,7 +414,7 @@ function paintLabels() {
     cardTitle: t("Collaboration board", "合作黑板"),
     inboxTitle: t("Open discussions", "公开讨论"),
     sendLine: t("Send", "发送"),
-    footerState: t("Closed trial", "封闭内测"),
+    footerState: t("Open café", "开放咖啡馆"),
   };
   for (const [id, value] of Object.entries(labels)) $(id).textContent = value;
   $("map").setAttribute(
@@ -793,20 +728,10 @@ function paintStage() {
       add(t("Post collaboration card", "发布合作卡"), cardForm);
   } else if (room.position)
     add(t("Cancel request", "取消申请"), () => act("cancel"));
-  else
-    add(
-      t("Request the stage", "申请上台"),
-      () =>
-        sitting() < 0
-          ? notice(t("Choose a seat first.", "请先入座。"))
-          : apply(),
-      "primary",
-    );
+  else add(t("I'd like to share", "我想分享"), apply, "primary");
   if (s && s.canVote) {
     const b = btn(
-      s.voted
-        ? t("Vote counted", "已投票")
-        : t("Continue +15 min", "续讲 15 分钟"),
+      s.voted ? t("Vote counted", "已投票") : t("Keep listening", "想继续听"),
       () => act("vote", { stage: s.id, round: s.round }),
     );
     b.disabled = s.voted;
@@ -817,9 +742,9 @@ function paintStage() {
     add("👏 " + t("Clap", "鼓掌"), () => act("gesture", { emoji: "👏" }));
   }
   $("queueStatus").textContent = [
-    t("Speaker queue · ", "候讲人数 · ") + room.queued,
+    room.queued ? t("Speaker queue · ", "候讲人数 · ") + room.queued : "",
     room.position ? t("Your position ", "你的位置 ") + room.position : "",
-    s ? t("Continue votes ", "续讲票 ") + s.votes + "/11" : "",
+    s?.votingOpen ? t("Continue votes ", "续讲票 ") + s.votes + "/11" : "",
   ]
     .filter(Boolean)
     .join(" / ");
@@ -1221,11 +1146,9 @@ $("sayForm").onsubmit = (e) => {
   e.preventDefault();
   const input = $("sayText");
   if (!input.value.trim()) return;
-  gate(() =>
-    act("say", { ...stageData(), text: input.value })
-      .then(() => (input.value = ""))
-      .catch((e) => notice(errorText(e))),
-  );
+  act("say", { ...stageData(), text: input.value })
+    .then(() => (input.value = ""))
+    .catch((e) => notice(errorText(e)));
 };
 function connect() {
   socket = new WebSocket(

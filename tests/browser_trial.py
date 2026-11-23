@@ -135,12 +135,8 @@ def main():
                     h.screenshot(path=EVIDENCE / "cafe-desktop.png", full_page=True)
                     h.locator("#profile").click()
                     fill(h, name="Mia", tag="Founder")
-                    h.get_by_role(
-                        "button", name="Create participant invitation"
-                    ).click()
-                    invite = h.locator("#dialog input[readonly]").input_value()
                     submit(h)
-                    u.goto(invite)
+                    u.goto(url)
                     v.goto(url)
                     expect(u.locator("#take")).to_have_text("Take a seat")
                     v.locator("#chatNav").click()
@@ -208,14 +204,10 @@ def main():
                     evidence.append(
                         "Two Chrome clients rendered the visitor at the entrance and the seated speaker above their chair, in each viewer's language, including a 390px layout"
                     )
-                    h.get_by_role("button", name="Request the stage").click()
-                    fill(
-                        h,
-                        title="Finding our first customers",
-                        goal="Learn how we tested the first screen",
-                    )
+                    h.get_by_role("button", name="I'd like to share").click()
+                    expect(h.locator("#dialogBody input")).to_have_count(1)
+                    fill(h, title="Finding our first customers")
                     submit(h)
-                    h.get_by_role("button", name="Confirm — take the stage").click()
                     expect(u.locator("#stageState")).to_have_text("分享中")
                     chat_input.fill("分享时也可以在大厅聊天")
                     v.locator("#chatSend").click()

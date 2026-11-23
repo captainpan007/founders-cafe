@@ -16,8 +16,9 @@ test_queue_timeout_and_handoff (test_room.RoomCases.test_queue_timeout_and_hando
 test_schedule_owner_and_local_time (test_room.RoomCases.test_schedule_owner_and_local_time) ... ok
 test_single_writer_and_restart (test_room.RoomCases.test_single_writer_and_restart) ... ok
 test_two_extensions_and_duplicate (test_room.RoomCases.test_two_extensions_and_duplicate) ... ok
+test_visitors_raise_hands_without_seats_and_wait_their_turn (test_room.RoomCases.test_visitors_raise_hands_without_seats_and_wait_their_turn) ... ok
 
 ----------------------------------------------------------------------
-Ran 18 tests in 1.294s
+Ran 19 tests in 1.181s
 
 OK

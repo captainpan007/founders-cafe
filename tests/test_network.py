@@ -4,7 +4,6 @@ import asyncio
 import tempfile
 import unittest
 from pathlib import Path
-from uuid import uuid4
 
 from aiohttp import ClientSession, CookieJar
 from aiohttp.test_utils import TestServer
@@ -32,15 +31,15 @@ class NetworkTrial(unittest.IsolatedAsyncioTestCase):
         client = ClientSession(
             cookie_jar=CookieJar(unsafe=True), headers={"Origin": self.base}
         )
-        who = uuid4().hex
         async with client.post(
             self.base + "/api/enter",
-            json={"pass": self.app.sign("invite", who, "member")},
+            json={},
         ) as response:
             self.assertEqual(response.status, 200)
         ws = await client.ws_connect(self.base + "/room")
-        await ws.receive_json()
-        user = (client, ws, who)
+        snapshot = (await ws.receive_json())["data"]
+        self.assertEqual(snapshot["role"], "guest")
+        user = (client, ws, snapshot["me"])
         self.users.append(user)
         return user
 
@@ -77,7 +76,6 @@ class NetworkTrial(unittest.IsolatedAsyncioTestCase):
                 )[0],
                 200,
             )
-            self.assertEqual((await self.act(users[0], "confirm"))[0], 200)
             self.assertEqual((await self.act(outside, "claimSeat"))[0], 200)
             self.assertEqual(len(set(self.app.room.seats)), 50)
             stage = self.app.room.stage["id"]

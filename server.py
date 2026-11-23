@@ -45,8 +45,11 @@ def atomic(path, data):
 
 
 class Cafe:
-    def __init__(self, folder, clock=time.time, extra_host=None):
+    def __init__(self, folder, clock=time.time, extra_host=None, public_origin=None):
         self.allowed_hosts = {"127.0.0.1", "localhost", "::1"}
+        self.public_origin = public_origin
+        if public_origin:
+            self.allowed_hosts.add(urlsplit(public_origin).hostname)
         if extra_host:
             self.allowed_hosts.add(extra_host)
         folder.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -112,7 +115,7 @@ class Cafe:
 
     def scoped(self, req):
         origin = req.headers.get("Origin", "")
-        if origin != f"{req.scheme}://{req.host}":
+        if origin != (self.public_origin or f"{req.scheme}://{req.host}"):
             raise web.HTTPForbidden()
 
     def limited(self, key, count, seconds):
@@ -176,7 +179,7 @@ class Cafe:
             self.sign("session", who, role),
             httponly=True,
             samesite="Strict",
-            secure=req.secure,
+            secure=req.secure or bool(self.public_origin),
             max_age=90 * DAY,
             path="/",
         )
@@ -438,7 +441,7 @@ class Cafe:
 
         async def health(_):
             return web.json_response(
-                {"service": "founders-cafe", "version": 1, "instance": self.instance}
+                {"service": "founders-cafe", "version": 2, "instance": self.instance}
             )
 
         app.add_routes(
@@ -483,6 +486,10 @@ if __name__ == "__main__":
         "--private-ip",
         help="Explicit private LAN address; requires a trusted TLS cert and key",
     )
+    ap.add_argument(
+        "--public-origin",
+        help="Exact external HTTPS origin served through a loopback-only reverse proxy",
+    )
     ap.add_argument("--cert", type=Path)
     ap.add_argument("--tls-key", type=Path)
     args = ap.parse_args()
@@ -500,7 +507,18 @@ if __name__ == "__main__":
             )
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(args.cert, args.tls_key)
-    c = Cafe(args.data, extra_host=args.private_ip)
+    if args.public_origin:
+        import re
+
+        if args.private_ip or not re.fullmatch(
+            r"https://[a-z0-9.-]+", args.public_origin
+        ):
+            ap.error(
+                "--public-origin requires an HTTPS hostname with a loopback listener"
+            )
+        if args.data.resolve() == (ROOT / ".runtime/room").resolve():
+            ap.error("use a dedicated public room data directory")
+    c = Cafe(args.data, extra_host=args.private_ip, public_origin=args.public_origin)
     handoff = os.environ.pop("CAFE_IDLE_RESTART_SEATS", "")
     if os.environ.pop("CAFE_IDLE_RESTART_STDIN", "") == "1":
         handoff = sys.stdin.buffer.read(1024 * 1024)

@@ -126,6 +126,32 @@ class Room:
             self.finish(False)
         self.schedule()
 
+    def start_talk(self, talk):
+        who = talk["who"]
+        self.unschedule(who)
+        seat = self.seats_for(who)
+        returning = talk.get("returning")
+        if returning not in self.online or returning in self.seats:
+            returning = None
+        if seat is not None:
+            self.seats[seat] = returning
+        elif returning:
+            self.wait.insert(0, returning)
+        self.stage = dict(
+            id=uid(),
+            who=who,
+            title=talk["title"],
+            goal=talk["goal"],
+            terms=talk["terms"],
+            lang=talk["lang"],
+            round=1,
+            end=self.clock() + ROUND,
+            votes=set(),
+            eligible=None,
+            lines=[],
+            mic=False,
+        )
+
     def finish(self, come_back):
         s, self.stage = self.stage, None
         if s["id"] in self.db["cards"]:
@@ -175,7 +201,7 @@ class Room:
             s["eligible"] = {
                 p
                 for p in self.seats
-                if p in self.online and self.person(p)["role"] != "guest"
+                if p in self.online and not self.person(p)["muted"]
             }
             changed = True
         for key, val in list(self.effects.items()):
@@ -193,23 +219,12 @@ class Room:
         p = self.person(who)
         ishost = p["role"] == "host"
         check(kind not in ("propose", "message", "block"), "refresh")
-        if kind not in (
-            "profile",
-            "speakLang",
-            "seat",
-            "leave",
-            "wait",
-            "claimSeat",
-            "gesture",
-            "chat",
-            "replyPublic",
-            "report",
-        ):
-            check(p["role"] != "guest", "pass")
         if kind in (
             "apply",
             "confirm",
             "say",
+            "vote",
+            "editLine",
             "chat",
             "proposePublic",
             "replyPublic",
@@ -274,49 +289,31 @@ class Room:
             self.seats[self.held["seat"]] = who
             self.held = None
         elif kind == "apply":
-            check(who in self.seats, "seat")
+            check(not s or s["who"] != who, "queued")
             check(
                 not any(q["who"] == who for q in self.queue)
                 and not (self.call and self.call["who"] == who),
                 "queued",
             )
-            self.queue.append(
-                dict(
-                    who=who,
-                    title=field(d, "title", 90),
-                    goal=field(d, "goal", 180),
-                    terms=field(d, "terms", 100, False),
-                    lang=p["lang"],
-                )
+            talk = dict(
+                who=who,
+                title=field(d, "title", 90),
+                goal=field(d, "goal", 180, False),
+                terms=field(d, "terms", 100, False),
+                lang=p["lang"],
             )
+            if not self.stage and not self.call and not self.queue:
+                self.start_talk(talk)
+            else:
+                self.queue.append(talk)
         elif kind == "cancel":
             if self.call and self.call["who"] == who and self.call.get("returning"):
                 self.wait.insert(0, self.call.pop("returning"))
             self.unschedule(who)
         elif kind == "confirm":
-            check(self.call and self.call["who"] == who and who in self.seats, "stale")
-            q, self.call = self.call, None
-            idx = self.seats.index(who)
-            returning = q.get("returning")
-            self.seats[idx] = (
-                returning
-                if returning in self.online and returning not in self.seats
-                else None
-            )
-            self.stage = dict(
-                id=uid(),
-                who=who,
-                title=q["title"],
-                goal=q["goal"],
-                terms=q["terms"],
-                lang=q["lang"],
-                round=1,
-                end=self.clock() + ROUND,
-                votes=set(),
-                eligible=None,
-                lines=[],
-                mic=False,
-            )
+            check(self.call and self.call["who"] == who, "stale")
+            talk, self.call = self.call, None
+            self.start_talk(talk)
         elif kind == "end":
             self.finish(True)
         elif kind == "vote":
@@ -329,6 +326,7 @@ class Room:
             )
             s["votes"].add(who)
         elif kind == "mic":
+            check(not d.get("on") or not p["muted"], "muted")
             s["mic"] = d.get("on") is True
         elif kind == "chat":
             text = field(d, "text", 600)
@@ -572,6 +570,7 @@ class Room:
             stage = {k: v for k, v in s.items() if k not in ("eligible", "votes")}
             stage.update(
                 votes=len(s["votes"]),
+                votingOpen=s["eligible"] is not None,
                 canVote=s["eligible"] is not None
                 and who in s["eligible"]
                 and who in self.seats,
