@@ -19,7 +19,8 @@ export const seats = Array.from({ length: 50 }, (_, i) => {
 let sceneTimer,
   priorSeats = [],
   arrived = new Map();
-export function draw(canvas, room, zh) {
+export const stageSpot = [308, 92];
+export function draw(canvas, room, zh, doorway = []) {
   clearTimeout(sceneTimer);
   const now = performance.now(),
     motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -33,7 +34,7 @@ export function draw(canvas, room, zh) {
     (arrived.size || Object.keys(room.effects).length) &&
     canvas.offsetParent !== null
   )
-    sceneTimer = setTimeout(() => draw(canvas, room, zh), 85);
+    sceneTimer = setTimeout(() => draw(canvas, room, zh, doorway), 85);
   const g = canvas.getContext("2d");
   g.imageSmoothingEnabled = false;
   const rect = (x, y, w, h, c) => {
@@ -308,7 +309,7 @@ export function draw(canvas, room, zh) {
   pot(578, 96, 1.23);
   pot(9, 124, 0.9);
   if (room?.stage) {
-    avatar(308, 92, room.stage.who);
+    avatar(...stageSpot, room.stage.who);
     personLabel(310, 67, room.stage.who);
   }
   function chair(x, y, i) {
@@ -354,4 +355,8 @@ export function draw(canvas, room, zh) {
   rect(244, 326, 113, 15, "#bf895f");
   label(zh ? "入 口" : "ENTRANCE", 301, 337, "#634c39", 8);
   rect(0, 352, W, 6, "#8b7359");
+  for (const { who, x, y } of doorway) {
+    avatar(x, y, who);
+    personLabel(x, y - 22, who);
+  }
 }

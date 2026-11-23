@@ -562,3 +562,46 @@ body:lang(zh) .opener h1 {
 .big-type #chatLog .translation {
   font-size: 1.35em;
 }
+
+#speechBubbles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.speech-bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(16em, 46%);
+  padding: 4px 8px;
+  border: 1.5px solid #5c533d;
+  border-radius: 9px;
+  background: #fff9e8;
+  color: #2c3529;
+  font: 600 clamp(11px, 1.15vw, 15px) / 1.3 var(--sans);
+  text-align: start;
+  box-shadow: 0 2px 0 #51362235;
+}
+.speech-bubble span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.speech-bubble::after {
+  content: "";
+  position: absolute;
+  left: var(--tail);
+  top: 100%;
+  width: 7px;
+  height: 7px;
+  background: inherit;
+  border: solid #5c533d;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.speech-bubble[data-own="true"] {
+  background: #eaf5db;
+}

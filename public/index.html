@@ -47,6 +47,7 @@
             <div class="scene">
               <canvas id="map" width="600" height="358" role="img"></canvas>
               <div id="spots"></div>
+              <div id="speechBubbles" aria-hidden="true"></div>
             </div>
             <div id="seatList" hidden></div>
             <div class="map-foot">
@@ -67,7 +68,10 @@
         </div>
         <div class="lower">
           <section class="panel stream" id="chat">
-            <div class="map-head"><h2 id="chatTitle"></h2></div>
+            <div class="map-head">
+              <h2 id="chatTitle"></h2>
+              <button id="showFloor" type="button" class="small"></button>
+            </div>
             <div id="chatLog"></div>
             <form id="chatForm">
               <select

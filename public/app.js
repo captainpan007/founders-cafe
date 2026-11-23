@@ -1,4 +1,4 @@
-import { seats, draw } from "./scene.js";
+import { seats, stageSpot, draw } from "./scene.js";
 import * as audio from "./audio.js";
 const $ = (id) => document.getElementById(id),
   t = (en, zh) => (language === "zh" ? zh : en);
@@ -463,6 +463,7 @@ function paintLabels() {
     stageLabel: t("The stage", "开放讲台"),
     chatNav: t("Chat", "聊天"),
     chatTitle: t("Café chat", "大厅聊天"),
+    showFloor: t("View café floor", "看座位区"),
     chatSend: t("Send", "发送"),
     transcriptTitle: t("Stage conversation", "讲台交流"),
     cardTitle: t("Collaboration board", "合作黑板"),
@@ -492,8 +493,152 @@ function paintLabels() {
   $("roomNav").classList.toggle("active", page === "room");
   $("inboxNav").classList.toggle("active", page === "inbox");
 }
+// The previous local server sends chat snapshots without message IDs or timestamps.
+// Carry over the shared tail across snapshots so a redraw never replays old greetings.
+function stampLegacyChat(previous, next) {
+  if (!next.chat?.length || next.chat.every((line) => line.at != null)) return;
+  const key = (line) =>
+    line.id ?? JSON.stringify([line.who, line.lang, line.text]);
+  const blocked = new Set(
+    next.offers
+      .filter((o) => o.blocked)
+      .map((o) => (o.from === next.me ? o.owner : o.from)),
+  );
+  const old = (previous?.chat || []).filter((line) => !blocked.has(line.who));
+  const oldKeys = old.map(key),
+    newKeys = next.chat.map(key);
+  let shared = Math.min(old.length, newKeys.length);
+  while (
+    shared &&
+    !oldKeys.slice(-shared).every((value, i) => value === newKeys[i])
+  )
+    shared--;
+  next.chat.forEach((line, i) => {
+    line.at ??=
+      i < shared ? old[old.length - shared + i].at : previous ? next.now : 0;
+  });
+}
+
+const bubbleLifetime = 10;
+let bubbleTimer;
+function layoutBubbles() {
+  const layer = $("speechBubbles");
+  const { clientWidth: width, clientHeight: height } = layer;
+  if (!width || !height) return;
+  const placed = [];
+  // Give the newest utterance the space closest to its speaker.
+  for (const node of layer.children) {
+    const x = (width * Number(node.dataset.x)) / 600;
+    const head = (height * (Number(node.dataset.y) - 30)) / 358;
+    const w = node.offsetWidth,
+      h = node.offsetHeight;
+    const left = Math.max(2, Math.min(width - w - 2, x - w / 2));
+    let top = Math.max(2, head - h - 5);
+    for (const other of placed.toSorted((a, b) => b.top - a.top)) {
+      if (
+        left < other.right + 3 &&
+        left + w + 3 > other.left &&
+        top < other.bottom + 4 &&
+        top + h + 4 > other.top
+      ) {
+        top = Math.max(2, other.top - h - 6);
+      }
+    }
+    placed.push({ left, right: left + w, top, bottom: top + h });
+    node.style.left = left + "px";
+    node.style.top = top + "px";
+    node.style.zIndex = String(layer.childElementCount - placed.length + 1);
+    node.style.setProperty(
+      "--tail",
+      Math.min(w - 6, Math.max(6, x - left)) + "px",
+    );
+  }
+}
+new ResizeObserver(layoutBubbles).observe($("speechBubbles"));
+
+function paintBubbles() {
+  clearTimeout(bubbleTimer);
+  const layer = $("speechBubbles"),
+    latest = new Map();
+  const now = Date.now() / 1000 + offset;
+  if (online && page === "room" && !list) {
+    const blocked = new Set(
+      room.offers
+        .filter((o) => o.blocked)
+        .map((o) => (o.from === room.me ? o.owner : o.from)),
+    );
+    for (const line of [...(room.chat || []), ...(room.stage?.lines || [])]) {
+      if (
+        !blocked.has(line.who) &&
+        line.at > now - bubbleLifetime &&
+        (!latest.has(line.who) || line.at >= latest.get(line.who).at)
+      )
+        latest.set(line.who, line);
+    }
+  }
+  const lines = [...latest.values()].sort((a, b) => b.at - a.at);
+  const waiting = lines.filter(
+    (line) => !room.seats.includes(line.who) && room.stage?.who !== line.who,
+  );
+  // Make visitors visible at the entrance while they speak, without allocating a chair.
+  const gap = Math.min(62, 540 / Math.max(1, waiting.length));
+  const doorway = waiting.map((line, i) => ({
+    who: line.who,
+    x: 300 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * gap,
+    y: 339,
+  }));
+  draw($("map"), room, language === "zh", doorway);
+  const current = new Map(
+    [...layer.children].map((node) => [node.dataset.who, node]),
+  );
+  const nodes = [];
+  for (const line of lines) {
+    const seat = room.seats.indexOf(line.who),
+      onStage = room.stage?.who === line.who;
+    const visitor =
+      seat < 0 && !onStage ? doorway.find((p) => p.who === line.who) : null;
+    const [x, y] = onStage
+      ? stageSpot
+      : seat >= 0
+        ? seats[seat]
+        : [visitor.x, visitor.y];
+    let node = current.get(line.who);
+    if (!node) {
+      node = el("div", "", "speech-bubble");
+      node.append(el("span"));
+      node.dataset.who = line.who;
+    }
+    node.dataset.own = String(line.who === room.me);
+    node.dataset.x = x;
+    node.dataset.y = y;
+    node.dataset.anchor = onStage ? "stage" : seat >= 0 ? "seat" : "entrance";
+    const signature = JSON.stringify([line.text, line.lang, language]);
+    if (node.dataset.content !== signature) {
+      node.dataset.content = signature;
+      node.firstChild.textContent = line.text;
+      if (line.lang !== language)
+        translated(line.text, line.lang, language)
+          .then((text) => {
+            if (node.isConnected && node.dataset.content === signature) {
+              node.firstChild.textContent = text;
+              layoutBubbles();
+            }
+          })
+          .catch(() => {}); // The original remains visible during a translation outage.
+    }
+    nodes.push(node);
+  }
+  layer.replaceChildren(...nodes);
+  layoutBubbles();
+  if (lines.length) {
+    const expires = lines[lines.length - 1].at + bubbleLifetime;
+    bubbleTimer = setTimeout(
+      paintBubbles,
+      Math.max(10, (expires - now) * 1000 + 5),
+    );
+  }
+}
 function paintFloor() {
-  draw($("map"), room, language === "zh");
   const n = room.seats.filter(Boolean).length;
   $("roomInfo").textContent = t(
     "One shared stage · 15-minute talks",
@@ -517,6 +662,7 @@ function paintFloor() {
             : t("Take a seat", "找个座位");
   document.querySelector(".scene").hidden = list;
   $("seatList").hidden = !list;
+  paintBubbles();
   for (const target of [list ? "seatList" : "spots"]) {
     const box = $(target);
     if (box.children.length !== 50) {
@@ -982,11 +1128,19 @@ function paint() {
     paintChat();
     paintLines();
     paintCards();
-  } else paintInbox();
+  } else {
+    paintBubbles();
+    paintInbox();
+  }
 }
 $("roomNav").onclick = () => {
   page = "room";
   paint();
+};
+$("showFloor").onclick = () => {
+  list = false;
+  paint();
+  $("map").scrollIntoView({ block: "center" });
 };
 $("chatNav").onclick = () => {
   page = "room";
@@ -1080,6 +1234,7 @@ function connect() {
     if (msg.type !== "room" || (room && online && msg.data.rev < room.rev))
       return;
     if (room?.stage?.id !== msg.data.stage?.id) translations.clear();
+    stampLegacyChat(online ? room : null, msg.data);
     room = msg.data;
     online = true;
     offset = room.now - Date.now() / 1000;
@@ -1095,6 +1250,7 @@ function connect() {
   };
   socket.onclose = () => {
     online = false;
+    if (room) paintBubbles();
     audio.stopMic();
     paintLabels();
     clearTimeout(retryTimer);

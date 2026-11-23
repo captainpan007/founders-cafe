@@ -321,7 +321,9 @@ class Room:
             s["mic"] = d.get("on") is True
         elif kind == "chat":
             text = field(d, "text", 600)
-            self.chat.append(dict(who=who, text=text, lang=p["lang"]))
+            self.chat.append(
+                dict(id=uid(), who=who, text=text, lang=p["lang"], at=self.clock())
+            )
             self.chat = self.chat[-80:]
         elif kind == "say":
             check(who == s["who"] or who in self.seats, "seat")

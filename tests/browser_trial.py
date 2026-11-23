@@ -169,6 +169,11 @@ def main():
                     expect(
                         h.locator("#chatLog .translation > span").first
                     ).to_contain_text(re.compile("[a-zA-Z]"), timeout=30000)
+                    entrance = ".speech-bubble[data-anchor=entrance]"
+                    expect(v.locator(entrance)).to_have_text("大家好")
+                    expect(h.locator(entrance)).to_have_text(
+                        re.compile("[a-zA-Z]"), timeout=30000
+                    )
                     expect(chat_input).to_have_value("")
                     expect(v.locator("#take")).to_have_text("找个座位")
                     evidence.append(
@@ -184,6 +189,25 @@ def main():
                     evidence.append(
                         "Two participants and a third observer see the same seats"
                     )
+                    # A sitting visitor speaks over their own seat, even before the talk.
+                    u.locator("#chatText").fill("我坐好了")
+                    u.locator("#chatSend").click()
+                    own_seat = u.locator(
+                        ".speech-bubble[data-own=true][data-anchor=seat]"
+                    )
+                    expect(own_seat).to_have_text("我坐好了")
+                    expect(
+                        h.locator(".speech-bubble[data-anchor=seat]")
+                    ).to_contain_text(re.compile("[a-zA-Z]"))
+                    u.locator("#showFloor").click()
+                    assert own_seat.evaluate("""n => {
+                        const b=n.getBoundingClientRect(), l=n.parentElement.getBoundingClientRect();
+                        return b.left>=l.left && b.right<=l.right+1 && b.top>=l.top &&
+                               b.bottom<l.top+Number(n.dataset.y)*l.height/358 && l.top<innerHeight;
+                    }""")
+                    evidence.append(
+                        "Two Chrome clients rendered the visitor at the entrance and the seated speaker above their chair, in each viewer's language, including a 390px layout"
+                    )
                     h.get_by_role("button", name="Request the stage").click()
                     fill(
                         h,
@@ -195,7 +219,7 @@ def main():
                     expect(u.locator("#stageState")).to_have_text("分享中")
                     chat_input.fill("分享时也可以在大厅聊天")
                     v.locator("#chatSend").click()
-                    expect(v.locator("#chatLog article")).to_have_count(2)
+                    expect(v.locator("#chatLog article")).to_have_count(3)
                     expect(h.locator("#lines")).not_to_contain_text(
                         "分享时也可以在大厅聊天"
                     )
@@ -212,6 +236,20 @@ def main():
                     expect(
                         h.locator("#lines .translation > span").first
                     ).not_to_have_text("我可以帮忙设计页面。", timeout=30000)
+                    expect(h.locator(".speech-bubble[data-anchor=stage]")).to_have_text(
+                        "We have three paying customers."
+                    )
+                    expect(u.locator(".speech-bubble[data-anchor=stage]")).to_have_text(
+                        u.locator("#lines article")
+                        .first.locator(".translation > span")
+                        .inner_text()
+                    )
+                    expect(
+                        u.locator(".speech-bubble[data-anchor=seat][data-own=true]")
+                    ).to_have_text("我可以帮忙设计页面。")
+                    h.locator(".scene").screenshot(
+                        path=EVIDENCE / "cafe-speech-bubbles.png"
+                    )
                     evidence.append(
                         "English talk and Chinese question cross two clients with real local translations"
                     )
@@ -267,6 +305,9 @@ def main():
                     fill(u, text="Friday 14:00")
                     submit(u)
                     expect(h.locator("#inbox")).to_contain_text("Friday 14:00")
+                    expect(v.locator("#speechBubbles")).not_to_contain_text(
+                        "Friday 14:00"
+                    )
                     v.locator("#inboxNav").click()
                     expect(v.locator("#inbox")).not_to_contain_text("Friday 14:00")
                     u.get_by_role("button", name="确认已约定下一步").click()
@@ -289,6 +330,19 @@ def main():
                     h.locator("#take").click()
                     submit(h)
                     expect(u.locator("#stageState")).to_have_text("空闲")
+                    v.locator("#roomNav").click()
+                    chat_input.fill("最后一句")
+                    v.locator("#chatSend").click()
+                    expect(v.locator(".speech-bubble[data-own=true]")).to_have_text(
+                        "最后一句"
+                    )
+                    expect(v.locator(".speech-bubble[data-own=true]")).to_have_count(
+                        0, timeout=14000
+                    )
+                    expect(v.locator("#chatLog")).to_contain_text("最后一句")
+                    evidence.append(
+                        "Stage text and seated questions used distinct anchors; private offer messages never entered bubbles. A fresh bubble expired while its original stayed in chat."
+                    )
                     assert not errors, errors
                     evidence.append(
                         "Mobile 390px without horizontal overflow; handoff clears old stage; no page exceptions"
