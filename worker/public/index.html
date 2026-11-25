@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8f5eb" />
+    <title>Founders’ Café · Live Pixel Mood Café for Builders</title>
+    <meta
+      name="description"
+      content="A live pixel café for builders. Pick your chaos mood, tap the wooden fish for no bugs, toss flying coffees, and ring the bell when you ship or make $1."
+    />
+    <meta property="og:title" content="Founders’ Café · Live Pixel Café for Builders" />
+    <meta
+      property="og:description"
+      content="Sit down, tap the wooden fish for zero bugs, fling coffee at someone fighting prod, or ring the bell for café-wide pixel fireworks."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>"
+    />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <div class="wrap bar">
+        <div class="brand-group">
+          <span class="cupmark" aria-hidden="true">☕</span>
+          <div>
+            <div class="brand">Founders’ Café</div>
+            <div id="liveBadge" class="live-badge">
+              <span class="dot"></span>
+              <span id="liveText">Connecting…</span>
+            </div>
+          </div>
+        </div>
+        <div class="controls-top">
+          <button id="rainBtn" class="pill-btn" type="button" title="Toggle cozy rain ambience">
+            🌧 <span id="rainLabel">Rain</span>
+          </button>
+          <button id="sfxBtn" class="pill-btn active" type="button" title="Toggle sound effects">
+            🔊 <span id="sfxLabel">Sound</span>
+          </button>
+          <button id="postcardBtn" class="pill-btn" type="button" title="Save PNG postcard for X / Threads">
+            📸 <span id="postcardLabel">Postcard</span>
+          </button>
+          <button id="profileBtn" class="pill-btn" type="button">
+            ☻ <span id="profileLabel">Me</span>
+          </button>
+          <select id="langSelect" class="pill-select" aria-label="Language">
+            <option value="en">EN</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <!-- HERO PIXEL CAFÉ CANVAS -->
+      <section class="stage-card">
+        <div class="canvas-shell">
+          <canvas id="cafeCanvas" width="960" height="540"></canvas>
+          <div id="eventBanner" class="event-banner" hidden>
+            <span id="eventBannerText"></span>
+            <button id="eventBannerAction" class="banner-cta" type="button"></button>
+          </div>
+          <div id="canvasTooltip" class="canvas-tooltip" hidden></div>
+        </div>
+        <div class="canvas-foot">
+          <span id="canvasHint">Click any empty chair to move · Click any builder to toss them a ☕</span>
+          <span id="seatCounter">0 / 50 seated</span>
+        </div>
+      </section>
+
+      <!-- TACTILE RITUAL DECK -->
+      <section class="deck">
+        <!-- Row 1: Chaos Moods -->
+        <div class="deck-group">
+          <div class="deck-label" id="moodTitle">Pick your chaos</div>
+          <div class="mood-row" id="moodRow">
+            <button class="mood-btn" data-mood="grinding" type="button">
+              <span class="em">🔥</span><span class="mlabel" data-i18n="mood_grinding">Grinding</span>
+            </button>
+            <button class="mood-btn" data-mood="ghost" type="button">
+              <span class="em">👻</span><span class="mlabel" data-i18n="mood_ghost">Soul Left Body</span>
+            </button>
+            <button class="mood-btn" data-mood="pray" type="button">
+              <span class="em">🐟</span><span class="mlabel" data-i18n="mood_pray">Praying to Prod</span>
+            </button>
+            <button class="mood-btn" data-mood="coffee" type="button">
+              <span class="em">☕</span><span class="mlabel" data-i18n="mood_coffee">Caffeinated</span>
+            </button>
+            <button class="mood-btn" data-mood="shipped" type="button">
+              <span class="em">🚀</span><span class="mlabel" data-i18n="mood_shipped">Just Shipped</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 2: Hero Rituals -->
+        <div class="ritual-grid">
+          <button id="prayBtn" class="ritual-btn ritual-pray" type="button">
+            <span class="ritual-icon">🐟</span>
+            <span class="ritual-copy">
+              <strong id="prayTitle">Tap Wooden Fish</strong>
+              <small id="praySub">+1 No Bugs · <span id="statPrayersInline">0</span></small>
+            </span>
+          </button>
+
+          <button id="celebrateBtn" class="ritual-btn ritual-ship" type="button">
+            <span class="ritual-icon">🎉</span>
+            <span class="ritual-copy">
+              <strong id="shipTitle">Ring Bell: I Shipped / Made $1</strong>
+              <small id="shipSub">Launches café-wide pixel fireworks</small>
+            </span>
+          </button>
+
+          <button id="sosBtn" class="ritual-btn ritual-sos" type="button">
+            <span class="ritual-icon">💥</span>
+            <span class="ritual-copy">
+              <strong id="sosTitle">Prod is Down! Send ☕</strong>
+              <small id="sosSub">Flash beacon & catch flying coffees</small>
+            </span>
+          </button>
+
+          <button id="tossBtn" class="ritual-btn ritual-toss" type="button">
+            <span class="ritual-icon">☕</span>
+            <span class="ritual-copy">
+              <strong id="tossTitle">Toss a Coffee</strong>
+              <small id="tossSub">Fling a cup across the room</small>
+            </span>
+          </button>
+        </div>
+
+        <!-- Row 3: Quick Head Bubble + Cheer Reactions -->
+        <div class="bubble-bar">
+          <form id="bubbleForm" class="bubble-form">
+            <input
+              id="bubbleInput"
+              type="text"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="Pop a thought above your pixel head…"
+            />
+            <button id="bubbleSend" class="send-btn" type="submit">Say</button>
+          </form>
+          <div class="cheer-row" aria-label="Quick cheers">
+            <button class="cheer-btn" data-emoji="👏" type="button" title="Clap">👏</button>
+            <button class="cheer-btn" data-emoji="🔥" type="button" title="Fire">🔥</button>
+            <button class="cheer-btn" data-emoji="☕" type="button" title="Coffee">☕</button>
+            <button class="cheer-btn" data-emoji="🚀" type="button" title="Ship">🚀</button>
+            <button class="cheer-btn" data-emoji="💀" type="button" title="RIP">💀</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- GLOBAL STATS + RECENT CAFÉ MOMENTS -->
+      <section class="lower-grid">
+        <div class="card stats-card">
+          <h2 id="statsHeading">Café Counter · All Time</h2>
+          <div class="stat-boxes">
+            <div class="stat-box">
+              <div class="stat-num" id="statPrayers">0</div>
+              <div class="stat-lbl" id="lblPrayers">🐟 Prod Prayers</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num" id="statCoffees">0</div>
+              <div class="stat-lbl" id="lblCoffees">☕ Coffees Tossed</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num" id="statCelebrations">0</div>
+              <div class="stat-lbl" id="lblCelebrations">🎉 Ships Celebrated</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num" id="statVisitors">0</div>
+              <div class="stat-lbl" id="lblVisitors">🚪 Visits</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card moments-card">
+          <h2 id="momentsHeading">Recent Bells & Prod SOS</h2>
+          <ul id="momentsList" class="moments-list"></ul>
+        </div>
+      </section>
+    </main>
+
+    <!-- PROFILE / BELL / SOS MODAL -->
+    <dialog id="modal">
+      <form id="modalForm" method="dialog">
+        <div class="modal-head">
+          <h3 id="modalTitle"></h3>
+          <button id="modalClose" type="button" class="pill-btn" aria-label="Close">×</button>
+        </div>
+        <div id="modalBody"></div>
+        <div class="modal-foot">
+          <button id="modalSubmit" type="submit" class="primary-btn"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+
+    <footer class="wrap foot">
+      <span>☕ Founders’ Café · Open 24/7</span>
+      <span id="footHint">Tap · Toss · Ship together</span>
+    </footer>
+  </body>
+</html>
